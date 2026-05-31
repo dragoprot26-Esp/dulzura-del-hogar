@@ -1,4 +1,11 @@
 /* ===== index.js — Dulzura del Hogar (página pública) ===== */
+// ========== CONFIGURACIÓN DE SUPABASE (misma que en CyC Admin) ==========
+const SB_URL = 'https://upoexzjltapiuijhszzk.supabase.co';
+const SB_KEY = 'sb_publishable_Ll8-8exzAJBQYqC4YQdflg_7qvjjakP';
+
+// Variables para control de sincronización
+let intervaloSync = null;
+let ultimaSincronizacion = 0;
 
 document.addEventListener('DOMContentLoaded', () => {
   aplicarApariencia();
@@ -6,7 +13,140 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarPromociones();
   cargarFooter();
   setupEventosPublicos();
+
+  // Iniciar sincronización periódica de la licencia con Supabase
+  iniciarSincronizacionLicencia();
 });
+
+/* ── Sincronización de licencia con Supabase (polling cada 30 segundos) ── */
+function iniciarSincronizacionLicencia() {
+  if (intervaloSync) clearInterval(intervaloSync);
+  // Ejecutar inmediatamente al cargar
+  sincronizarLicenciaConSupabase();
+  // Luego cada 30 segundos
+  intervaloSync = setInterval(() => {
+    sincronizarLicenciaConSupabase();
+  }, 30000);
+}
+
+async function sincronizarLicenciaConSupabase() {
+  // Obtener licencia actual desde localStorage
+  const lic = obtenerLicencia(); // función existente en licencia.js
+  if (!lic || !lic.codigo) {
+    // Si no hay licencia guardada, no hacer nada
+    actualizarTextoUltimaSync();
+    return;
+  }
+
+  const codigo = lic.codigo;
+  try {
+    const response = await fetch(`${SB_URL}/rest/v1/licencias?codigo=eq.${encodeURIComponent(codigo)}`, {
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': `Bearer ${SB_KEY}`
+      }
+    });
+    if (!response.ok) {
+      console.warn('Error al consultar Supabase:', response.status);
+      actualizarTextoUltimaSync();
+      return;
+    }
+    const data = await response.json();
+    if (!data || data.length === 0) {
+      console.warn('No se encontró licencia en Supabase para el código:', codigo);
+      actualizarTextoUltimaSync();
+      return;
+    }
+    const supabaseLic = data[0];
+    // Comparar fecha de vencimiento y estado activo con los datos locales
+    const localExpira = lic.expira || 0;
+    const remoteExpira = supabaseLic.fecha_vencimiento ? new Date(supabaseLic.fecha_vencimiento).getTime() : 0;
+    const localActiva = lic.valida === true;
+    const remoteActiva = supabaseLic.activa === true;
+
+    let cambios = false;
+    if (localExpira !== remoteExpira) {
+      lic.expira = remoteExpira;
+      cambios = true;
+    }
+    if (localActiva !== remoteActiva) {
+      lic.valida = remoteActiva;
+      cambios = true;
+    }
+    // También podrías actualizar otros campos como plan, etc.
+    if (cambios) {
+      // Guardar licencia actualizada en localStorage
+      localStorage.setItem('licencia_dulzura', JSON.stringify(lic));
+      // Refrescar la interfaz para mostrar el nuevo estado
+      mostrarInfoLicencia();    // función existente en licencia.js
+      cargarFooter();           // para actualizar el texto de sincronización y posiblemente datos de contacto
+      // Si hay un aviso de vencimiento visible, actualizarlo
+      const aviso = document.getElementById('avisoLicencia');
+      if (aviso) aviso.remove();
+      if (lic.valida && lic.expira) {
+        const diasRest = Math.ceil((lic.expira - Date.now()) / (1000*3600*24));
+        if (diasRest <= 3 && diasRest > 0) {
+          mostrarAvisoLicencia(diasRest);
+        }
+      }
+      console.log('Licencia actualizada desde Supabase');
+    }
+  } catch (err) {
+    console.error('Error en sincronización de licencia:', err);
+  } finally {
+    actualizarTextoUltimaSync();
+  }
+}
+
+function actualizarTextoUltimaSync() {
+  const syncSpan = document.getElementById('ultimaSyncTexto');
+  if (!syncSpan) return;
+  ultimaSincronizacion = Date.now();
+  const segundos = Math.floor((ultimaSincronizacion - (window._ultimaSyncAnterior || ultimaSincronizacion)) / 1000);
+  window._ultimaSyncAnterior = ultimaSincronizacion;
+  syncSpan.textContent = `🔄 Última sincronización: hace ${segundos} segundos`;
+  // También actualizar cada segundo aproximado (opcional)
+  if (window._syncTimer) clearInterval(window._syncTimer);
+  window._syncTimer = setInterval(() => {
+    if (!syncSpan) return;
+    const dif = Math.floor((Date.now() - ultimaSincronizacion) / 1000);
+    syncSpan.textContent = `🔄 Última sincronización: hace ${dif} segundos`;
+  }, 1000);
+}
+
+/* ── Footer dinámico (modificado para incluir estado de sincronización) ── */
+function cargarFooter() {
+  const tel   = localStorage.getItem('admin_telefono') || '5491112345678';
+  const email = localStorage.getItem('admin_email')    || 'contacto@dulzurahogar.com';
+  const linkWA   = document.getElementById('linkWA');
+  const linkMail = document.getElementById('linkMail');
+  if (linkWA)   linkWA.href   = `https://wa.me/${tel.replace(/\D/g,'')}`;
+  if (linkMail) linkMail.href = `mailto:${email}`;
+
+  // Agregar el texto de última sincronización si no existe
+  let syncSpan = document.getElementById('ultimaSyncTexto');
+  if (!syncSpan) {
+    const footer = document.querySelector('footer');
+    if (footer) {
+      const div = document.createElement('div');
+      div.className = 'text-muted mt-2';
+      div.style.fontSize = '0.7rem';
+      div.style.marginTop = '8px';
+      div.style.opacity = '0.6';
+      div.innerHTML = '<span id="ultimaSyncTexto">🔄 sincronizando...</span>';
+      footer.appendChild(div);
+      syncSpan = document.getElementById('ultimaSyncTexto');
+    }
+  }
+  if (syncSpan) {
+    if (ultimaSincronizacion === 0) {
+      syncSpan.textContent = '🔄 sincronizando...';
+    } else {
+      const dif = Math.floor((Date.now() - ultimaSincronizacion) / 1000);
+      syncSpan.textContent = `🔄 Última sincronización: hace ${dif} segundos`;
+    }
+  }
+}
 
 /* ── Apariencia (logo + nombre guardado por el admin) ── */
 function aplicarApariencia() {
@@ -41,16 +181,6 @@ function aplicarApariencia() {
 
   // Título de pestaña
   document.title = nombre;
-}
-
-/* ── Footer dinámico ── */
-function cargarFooter() {
-  const tel   = localStorage.getItem('admin_telefono') || '5491112345678';
-  const email = localStorage.getItem('admin_email')    || 'contacto@dulzurahogar.com';
-  const linkWA   = document.getElementById('linkWA');
-  const linkMail = document.getElementById('linkMail');
-  if (linkWA)   linkWA.href   = `https://wa.me/${tel.replace(/\D/g,'')}`;
-  if (linkMail) linkMail.href = `mailto:${email}`;
 }
 
 /* ── Render productos ── */
