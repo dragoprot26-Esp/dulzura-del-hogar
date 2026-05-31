@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel Admin — Dulzura del Hogar</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/estilos.css">
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body>
+
+<!-- ===== NAVBAR ===== -->
+<nav class="navbar" id="mainNavbar">
+  <a class="navbar-brand" href="index.html" id="navBrand">
+    <img id="navLogoImg" src="" alt="Logo" style="width:36px;height:36px;border-radius:8px;object-fit:cover;display:none;">
+    <span id="navLogoEmoji" style="font-size:1.6rem;">🍰</span>
+    <span id="navNombreApp">Dulzura del Hogar</span>
+  </a>
+  <div class="navbar-actions">
+    <!-- Campanita con label -->
+    <button class="bell-btn" id="bellBtn" title="Ver pedidos pendientes" aria-label="Pedidos pendientes">
+      🔔
+      <span class="bell-badge" id="bellBadge" style="display:none;"></span>
+    </button>
+    <button class="btn btn-outline" id="btnLogout">Cerrar sesión</button>
+  </div>
+</nav>
+
+<!-- ===== ADMIN LAYOUT ===== -->
+<div class="admin-layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="admin-sidebar">
+    <ul class="sidebar-menu">
+      <li class="activo"><a href="#" data-sec="secInicio">🏠 Inicio</a></li>
+      <li><a href="#" data-sec="secProductos">📦 Productos</a></li>
+      <li><a href="#" data-sec="secPromos">🎁 Promociones</a></li>
+      <li><a href="#" data-sec="secPedidos">🛒 Pedidos</a></li>
+      <li><a href="#" data-sec="secTemas">🎨 Apariencia</a></li>
+      <li><a href="#" data-sec="secLicencia">🔑 Licencia</a></li>
+      <li><a href="#" data-sec="secCuenta">👤 Mi cuenta</a></li>
+      <li><a href="#" data-sec="secGuia">📘 Guía rápida</a></li>
+    </ul>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="admin-main">
+
+    <!-- ═══ INICIO ═══ -->
+    <section class="admin-section activo" id="secInicio">
+      <h2 id="saludoAdmin" style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--primary-dark);margin-bottom:20px;">¡Hola! 👋</h2>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="statProductos">0</div>
+          <div class="stat-label">Productos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statPedidosPend" style="color:var(--warning);">0</div>
+          <div class="stat-label">Encargos pendientes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="statPedidosComp" style="color:var(--success);">0</div>
+          <div class="stat-label">Completados</div>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="irSeccion('secProductos')">📦 Ver productos</button>
+        <button class="btn btn-ghost" onclick="abrirDrawerPedidos()">🛒 Ver encargos</button>
+      </div>
+    </section>
+
+    <!-- ═══ PRODUCTOS ═══ -->
+    <section class="admin-section" id="secProductos">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">📦 Productos</h3>
+          <button class="btn btn-primary btn-sm" id="btnNuevoProducto">➕ Nuevo producto</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Imagen</th>
+                <th>Nombre</th>
+                <th>Precio</th>
+                <th>Detalle</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="listaProductosAdmin"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PROMOCIONES ═══ -->
+    <section class="admin-section" id="secPromos">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🎁 Promociones</h3>
+          <button class="btn btn-primary btn-sm" id="btnNuevaPromo">➕ Nueva promoción</button>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Imagen</th>
+                <th>Título</th>
+                <th>Precio</th>
+                <th>Descripción</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="listaPromosAdmin"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ PEDIDOS ═══ -->
+    <section class="admin-section" id="secPedidos">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">⏳ Encargos pendientes</h3>
+          <button class="btn btn-ghost btn-sm" onclick="cargarPedidosAdmin()">🔄 Actualizar</button>
+        </div>
+        <div id="listaPedidosPend"></div>
+      </div>
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">✅ Encargos completados</h3>
+        </div>
+        <div id="listaPedidosComp"></div>
+      </div>
+    </section>
+
+    <!-- ═══ APARIENCIA ═══ -->
+    <section class="admin-section" id="secTemas">
+      <!-- Logo y nombre -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🖼️ Logo y nombre</h3>
+        </div>
+        <p class="text-muted mb-3">Personalizá el logo y el nombre que aparece en toda la app.</p>
+
+        <!-- Preview -->
+        <div style="display:flex;align-items:center;gap:14px;background:var(--nav-bg);padding:14px 20px;border-radius:12px;margin-bottom:20px;">
+          <div id="logoPreviewWrap" style="font-size:2rem;" id="logoPreviewEmoji">🍰</div>
+          <span id="nombrePreview" style="font-family:'Playfair Display',serif;font-size:1.2rem;color:#fdf0e8;font-weight:700;">Dulzura del Hogar</span>
+        </div>
+
+        <div class="form-group">
+          <label>Nombre de la tienda</label>
+          <input type="text" id="inputNombreApp" placeholder="Dulzura del Hogar" maxlength="40">
+        </div>
+
+        <div class="form-group">
+          <label>Emoji de logo (opción rápida)</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;" id="emojisPicker">
+            <span class="emoji-opt" data-e="🍰">🍰</span>
+            <span class="emoji-opt" data-e="🧁">🧁</span>
+            <span class="emoji-opt" data-e="🍬">🍬</span>
+            <span class="emoji-opt" data-e="🍫">🍫</span>
+            <span class="emoji-opt" data-e="🎂">🎂</span>
+            <span class="emoji-opt" data-e="🍩">🍩</span>
+            <span class="emoji-opt" data-e="🥧">🥧</span>
+            <span class="emoji-opt" data-e="🌸">🌸</span>
+            <span class="emoji-opt" data-e="🏠">🏠</span>
+            <span class="emoji-opt" data-e="⭐">⭐</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>O subí tu propio logo (imagen)</label>
+          <input type="file" id="inputLogoFile" accept="image/*" style="display:none;">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('inputLogoFile').click()">📁 Elegir imagen</button>
+            <button class="btn btn-ghost btn-sm" onclick="quitarLogoImagen()">✕ Quitar imagen</button>
+            <span id="logoFileNombre" class="text-muted" style="font-size:0.82rem;"></span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="btnGuardarApariencia">💾 Guardar logo y nombre</button>
+      </div>
+
+      <!-- Temas de color -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🎨 Tema de color</h3>
+        </div>
+        <p class="text-muted mb-3">El cambio se aplica inmediatamente en toda la app.</p>
+        <div class="temas-grid">
+          <div class="tema-opcion" data-tema="claro">
+            <div class="tema-preview" style="background:linear-gradient(135deg,#fdf8f4,#c0623a);"></div>
+            <label>☀️ Claro</label>
+          </div>
+          <div class="tema-opcion" data-tema="oscuro">
+            <div class="tema-preview" style="background:linear-gradient(135deg,#1a1208,#e07840);"></div>
+            <label>🌙 Oscuro</label>
+          </div>
+          <div class="tema-opcion" data-tema="navidad">
+            <div class="tema-preview" style="background:linear-gradient(135deg,#1a3a1a,#b22222);"></div>
+            <label>🎄 Navidad</label>
+          </div>
+          <div class="tema-opcion" data-tema="floral">
+            <div class="tema-preview" style="background:linear-gradient(135deg,#fdf6fb,#a0408a);"></div>
+            <label>🌸 Floral</label>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ LICENCIA ═══ -->
+    <section class="admin-section" id="secLicencia">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🔑 Licencia</h3>
+        </div>
+        <div id="licenciaEstado" class="licencia-estado licencia-ok">✅ Verificando...</div>
+        <hr class="divider">
+        <p class="text-muted mb-3">¿Tenés un código de licencia? Ingresalo acá para activarlo.</p>
+        <div class="form-group">
+          <label for="inputCodigo">Código de licencia</label>
+          <input type="text" id="inputCodigo" placeholder="Ej: DULZ-PREM-2026-XXXX" style="font-family:monospace;letter-spacing:2px;text-transform:uppercase;">
+        </div>
+        <button class="btn btn-primary" id="btnActivarLicencia">🔑 Activar licencia</button>
+        <hr class="divider">
+        <p class="text-muted" style="font-size:0.83rem;">
+          Planes disponibles: 15, 30, 60, 90, 120, 180, 240, 300 días.<br>
+          Contacto proveedor: <a href="mailto:dragoprot26@gmail.com" style="color:var(--primary);">dragoprot26@gmail.com</a>
+        </p>
+      </div>
+    </section>
+
+    <!-- ═══ MI CUENTA ═══ -->
+    <section class="admin-section" id="secCuenta">
+
+      <!-- Datos personales -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">👤 Mis datos</h3>
+        </div>
+        <div class="admin-avatar">👩‍🍳</div>
+        <div class="form-group">
+          <label for="adminNombre">Nombre</label>
+          <input type="text" id="adminNombre" placeholder="Tu nombre">
+        </div>
+        <div class="form-group">
+          <label for="adminEmail">Correo electrónico</label>
+          <input type="email" id="adminEmail" placeholder="tu@correo.com">
+        </div>
+        <div class="form-group">
+          <label for="adminTelefono">Teléfono WhatsApp (con código de país)</label>
+          <input type="tel" id="adminTelefono" placeholder="5491112345678">
+        </div>
+        <button class="btn btn-primary" id="btnGuardarAdmin">💾 Guardar cambios</button>
+      </div>
+
+      <!-- Compartir app -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🔗 Compartir mi tienda</h3>
+        </div>
+        <p class="text-muted mb-3">Compartí el link de tu tienda con clientes nuevos.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+          <input type="text" id="linkTienda" readonly style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:0.85rem;min-width:0;">
+          <button class="btn btn-ghost btn-sm" onclick="copiarLinkTienda()">📋 Copiar</button>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="compartirWhatsApp()" style="background:#25D366;flex:1;min-width:140px;">
+            📱 WhatsApp
+          </button>
+          <button class="btn btn-primary" onclick="compartirEmail()" style="flex:1;min-width:140px;">
+            ✉️ Correo electrónico
+          </button>
+          <button class="btn btn-ghost" onclick="compartirNativo()" style="flex:1;min-width:140px;">
+            🔗 Más opciones
+          </button>
+        </div>
+      </div>
+
+      <!-- Cambiar contraseña -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🔒 Cambiar contraseña</h3>
+        </div>
+        <div class="form-group">
+          <label for="passActual">Contraseña actual</label>
+          <input type="password" id="passActual" placeholder="••••••">
+        </div>
+        <div class="form-group">
+          <label for="passNueva">Nueva contraseña</label>
+          <input type="password" id="passNueva" placeholder="Mínimo 4 caracteres">
+        </div>
+        <div class="form-group">
+          <label for="passRepetir">Repetir nueva contraseña</label>
+          <input type="password" id="passRepetir" placeholder="Igual que la anterior">
+        </div>
+        <button class="btn btn-ghost" id="btnCambiarPass">🔑 Cambiar contraseña</button>
+      </div>
+
+    </section>
+
+    <!-- ═══ GUÍA RÁPIDA ═══ -->
+    <section class="admin-section" id="secGuia">
+      <div class="panel-card">
+        <h3 class="panel-card-title">📘 Guía rápida de Dulzura del Hogar</h3>
+        <ol style="line-height:1.8;font-size:0.9rem;color:var(--text2);">
+          <li><strong>Agregá productos</strong> desde la sección "📦 Productos". Poné nombre, precio, imagen y detalle.</li>
+          <li><strong>Creá promociones</strong> en "🎁 Promociones" para destacar ofertas. Podés subir imágenes y un precio opcional.</li>
+          <li><strong>Gestioná encargos</strong> en "🛒 Pedidos". Recibís cada pedido y podés marcarlo como completado.</li>
+          <li><strong>Personalizá la tienda</strong> en "🎨 Apariencia". Cambiá colores, logo y nombre.</li>
+          <li><strong>Compartí tu tienda</strong> desde "👤 Mi cuenta → Compartir mi tienda". Enviá el link a tus clientes por WhatsApp o email.</li>
+          <li><strong>Consultas y licencias</strong> en "🔑 Licencia" o escribí a <a href="mailto:dragoprot26@gmail.com">dragoprot26@gmail.com</a>.</li>
+        </ol>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===== DRAWER PEDIDOS ===== -->
+<div class="pedidos-panel" id="drawerPedidos">
+  <div class="pedidos-panel-header">
+    <span style="font-family:'Playfair Display',serif;font-size:1.1rem;">🛒 Encargos pendientes</span>
+    <button id="btnCerrarDrawer" style="background:none;border:none;color:inherit;font-size:1.3rem;cursor:pointer;">✕</button>
+  </div>
+  <div class="pedidos-panel-body" id="drawerPedidosCont"></div>
+</div>
+
+<!-- ===== MODAL PRODUCTO ===== -->
+<div class="modal-overlay" id="modalProducto">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" aria-label="Cerrar">✕</button>
+    <h2 class="modal-titulo" id="modalProdTitulo">Producto</h2>
+
+    <div class="form-group">
+      <label for="prodNombre">Nombre *</label>
+      <input type="text" id="prodNombre" placeholder="Ej: Alfajores de maicena">
+    </div>
+    <div class="form-group">
+      <label for="prodPrecio">Precio *</label>
+      <input type="number" id="prodPrecio" placeholder="1500" min="0">
+    </div>
+
+    <!-- ── Imagen: galería/cámara O url ── -->
+    <div class="form-group">
+      <label>Imagen del producto</label>
+      <div id="prodImagenPreview" style="width:100%;height:150px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:3rem;margin-bottom:10px;overflow:hidden;border:2px dashed var(--border);">
+        🍬
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgGaleria').click()">🖼️ Galería / PC</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnCamara" onclick="document.getElementById('inputImgCamara').click()">📷 Cámara</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleUrlImagen()">🌐 URL web</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="quitarImagenProducto()">✕ Quitar</button>
+      </div>
+      <input type="file" id="inputImgGaleria" accept="image/*" style="display:none;">
+      <input type="file" id="inputImgCamara" accept="image/*" capture="environment" style="display:none;">
+      <div id="urlImagenWrap" style="display:none;">
+        <input type="url" id="prodImagen" placeholder="https://... URL de imagen web"
+          oninput="previsualizarUrlImagen(this.value)"
+          style="width:100%;padding:10px 14px;border:2px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:0.9rem;">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="prodDetalle">Descripción</label>
+      <textarea id="prodDetalle" placeholder="Describí el producto..."></textarea>
+    </div>
+
+    <hr class="divider">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <label style="font-size:0.85rem;font-weight:700;color:var(--text2);">CAMPOS EXTRA</label>
+      <button type="button" class="btn btn-ghost btn-sm" id="btnAgregarCampo">+ Agregar campo</button>
+    </div>
+    <div id="camposExtraContainer"></div>
+
+    <button class="btn btn-primary btn-block" id="btnGuardarProducto" style="margin-top:16px;">💾 Guardar producto</button>
+  </div>
+</div>
+
+<!-- ===== MODAL PROMO (MEJORADO) ===== -->
+<div class="modal-overlay" id="modalPromo">
+  <div class="modal" style="max-width:520px;">
+    <button class="modal-close" aria-label="Cerrar">✕</button>
+    <h2 class="modal-titulo" id="modalPromoTitulo">Promoción</h2>
+    <div class="form-group">
+      <label for="promoTitulo">Título *</label>
+      <input type="text" id="promoTitulo" placeholder="Ej: Combo Familiar">
+    </div>
+    <div class="form-group">
+      <label for="promoBadge">Etiqueta</label>
+      <input type="text" id="promoBadge" placeholder="Ej: 🎉 Especial">
+    </div>
+
+    <!-- Imagen de la promo -->
+    <div class="form-group">
+      <label>Imagen (opcional)</label>
+      <div id="promoImagenPreview" style="width:100%;height:150px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:3rem;margin-bottom:10px;overflow:hidden;border:2px dashed var(--border);">
+        🎁
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgPromoGaleria').click()">🖼️ Galería / PC</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgPromoCamara').click()">📷 Cámara</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="quitarImagenPromo()">✕ Quitar</button>
+      </div>
+      <input type="file" id="inputImgPromoGaleria" accept="image/*" style="display:none;">
+      <input type="file" id="inputImgPromoCamara" accept="image/*" capture="environment" style="display:none;">
+    </div>
+
+    <div class="form-group">
+      <label for="promoPrecio">Precio (opcional)</label>
+      <input type="number" id="promoPrecio" placeholder="Ej: 2500" min="0">
+    </div>
+    <div class="form-group">
+      <label for="promoDesc">Descripción</label>
+      <textarea id="promoDesc" placeholder="Describí la promo..."></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" id="btnGuardarPromo">💾 Guardar promoción</button>
+  </div>
+</div>
+
+<script src="js/comun.js"></script>
+<script src="js/licencia.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
