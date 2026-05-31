@@ -9,12 +9,12 @@ document.addEventListener('DOMContentLoaded', () => {
   configurarFooterDesdeComun();   // Configura los links de contacto
   setupEventosPublicos();
 
-  // Iniciar sincronización automática de licencia (cada 30 segundos)
+  // La sincronización se iniciará desde admin.js cuando sea necesario
   if (typeof iniciarSincronizacionPeriodica === 'function') {
-    iniciarSincronizacionPeriodica();
-  } else {
-    console.warn('licencia.js no cargó correctamente');
-  }
+  iniciarSincronizacionPeriodica();
+} else {
+  console.warn('licencia.js no cargó correctamente');
+}
 });
 
 /* ── Apariencia (logo + nombre guardado por el admin) ── */
@@ -139,12 +139,15 @@ function setupEventosPublicos() {
 }
 
 function intentarLogin() {
-  const user  = document.getElementById('loginUser').value.trim();
-  const pass  = document.getElementById('loginPass').value;
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginError');
-  if (!user || !pass) { mostrarError(errEl, 'Completá usuario y contraseña.'); return; }
+  if (!user || !pass) {
+    mostrarError(errEl, 'Completá usuario y contraseña.');
+    return;
+  }
   if (loginAdmin(user, pass)) {
-    if (!obtenerLicenciaLocal()) { crearLicenciaTemporal(); alert('🎉 ¡Período de prueba de 15 días activado!'); }
+    // Redirigir directamente sin validar licencia aquí
     document.getElementById('modalLogin').classList.remove('activo');
     window.location.href = 'admin.html';
   } else {
