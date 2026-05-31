@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   actualizarLicenciaUI();
   mostrarInfoLicencia();
   cargarLinkTienda();
+  actualizarBiometriaUI();
 });
 
 /* ─── Navegación sidebar ─── */
@@ -628,10 +629,66 @@ function actualizarLicenciaUI() {
 async function activarCodigoLicencia() {
   const codigo = document.getElementById('inputCodigo')?.value.trim();
   if (!codigo) { toast('⚠️ Ingresá un código'); return; }
-  toast('🔄 Validando código...');
+  toast('🔄 Validando código con el servidor...');
   const ok = await activarLicencia(codigo);
-  if (ok) { toast('✅ ¡Licencia activada!'); actualizarLicenciaUI(); mostrarInfoLicencia(); }
-  else toast('❌ Código inválido o no encontrado');
+  if (ok) {
+    actualizarLicenciaUI();
+    mostrarInfoLicencia();
+    actualizarBiometriaUI();
+    setTimeout(() => {
+      if (confirm('✅ ¡Licencia activada!\n\nTus credenciales de acceso fueron actualizadas por el proveedor.\n¿Cerrar sesión ahora para ingresar con las nuevas credenciales?')) {
+        logoutAdmin();
+      }
+    }, 500);
+  } else {
+    toast('❌ Código inválido o ya activado en otra cuenta');
+  }
+}
+
+/* ══════════════════════════════════════════
+   BIOMETRÍA — Panel admin
+══════════════════════════════════════════ */
+function actualizarBiometriaUI() {
+  const estadoEl = document.getElementById('biometriaEstado');
+  const btnReg   = document.getElementById('btnRegistrarBiometria');
+  const btnDes   = document.getElementById('btnDesactivarBiometria');
+  if (!estadoEl) return;
+
+  if (!biometriaDisponible()) {
+    estadoEl.textContent = '⚠️ Este dispositivo no soporta autenticación biométrica';
+    estadoEl.className   = 'licencia-estado licencia-warning';
+    if (btnReg) btnReg.style.display = 'none';
+    if (btnDes) btnDes.style.display = 'none';
+    return;
+  }
+  if (biometriaRegistrada()) {
+    estadoEl.textContent = '✅ Biometría activada — ingresás con huella, PIN o patrón';
+    estadoEl.className   = 'licencia-estado licencia-ok';
+    if (btnReg) btnReg.style.display = 'none';
+    if (btnDes) btnDes.style.display = 'inline-block';
+  } else {
+    estadoEl.textContent = '🔓 Biometría no activada — usás solo usuario y contraseña';
+    estadoEl.className   = 'licencia-estado licencia-warning';
+    if (btnReg) btnReg.style.display = 'inline-block';
+    if (btnDes) btnDes.style.display = 'none';
+  }
+}
+
+async function registrarBiometriaAdmin() {
+  const ok = await registrarBiometria();
+  if (ok) {
+    toast('✅ ¡Biometría registrada! Ya podés ingresar sin contraseña');
+    actualizarBiometriaUI();
+  } else {
+    toast('⚠️ No se pudo registrar. Verificá permisos del dispositivo');
+  }
+}
+
+function desactivarBiometriaAdmin() {
+  if (!confirm('¿Desactivar el acceso biométrico?')) return;
+  desactivarBiometria();
+  toast('🔓 Biometría desactivada');
+  actualizarBiometriaUI();
 }
 
 /* ══════════════════════════════════════════
@@ -746,6 +803,10 @@ function configurarEventosAdmin() {
 
   // Licencia
   document.getElementById('btnActivarLicencia')?.addEventListener('click', activarCodigoLicencia);
+
+  // Biometría
+  document.getElementById('btnRegistrarBiometria')?.addEventListener('click', registrarBiometriaAdmin);
+  document.getElementById('btnDesactivarBiometria')?.addEventListener('click', desactivarBiometriaAdmin);
 
   // Cambiar contraseña
   document.getElementById('btnCambiarPass')?.addEventListener('click', cambiarContrasena);

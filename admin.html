@@ -233,6 +233,25 @@
           Contacto proveedor: <a href="mailto:dragoprot26@gmail.com" style="color:var(--primary);">dragoprot26@gmail.com</a>
         </p>
       </div>
+
+      <!-- ── BIOMETRÍA ── -->
+      <div class="panel-card" style="margin-top:16px;">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">🔒 Acceso biométrico</h3>
+        </div>
+        <p class="text-muted mb-3" style="font-size:0.88rem;">
+          Ingresá al panel con la huella dactilar, PIN o patrón de tu dispositivo, sin escribir contraseña cada vez.
+        </p>
+        <div id="biometriaEstado" class="licencia-estado licencia-warning" style="margin-bottom:14px;">
+          🔄 Verificando disponibilidad...
+        </div>
+        <button class="btn btn-primary" id="btnRegistrarBiometria" style="display:none;">
+          👆 Activar biometría / PIN
+        </button>
+        <button class="btn btn-outline" id="btnDesactivarBiometria" style="display:none;margin-top:8px;">
+          🗑️ Desactivar biometría
+        </button>
+      </div>
     </section>
 
     <!-- ═══ MI CUENTA ═══ -->
