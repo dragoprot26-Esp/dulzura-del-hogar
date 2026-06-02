@@ -346,9 +346,10 @@ function agregarCampoExtra(key = '', val = '') {
 }
 
 /* ══════════════════════════════════════════
-   PROMOCIONES
+   PROMOCIONES (con imagen y precio)
 ══════════════════════════════════════════ */
 let editandoPromoId = null;
+let imagenPromoActual = '';
 
 function getPromos() { return JSON.parse(localStorage.getItem('promos') || '[]'); }
 function setPromos(arr) { localStorage.setItem('promos', JSON.stringify(arr)); }
@@ -358,12 +359,18 @@ function cargarPromosAdmin() {
   if (!cont) return;
   const promos = getPromos();
   if (!promos.length) {
-    cont.innerHTML = `<tr><td colspan="3" class="text-center text-muted" style="padding:24px;">No hay promociones.</td></tr>`;
+    cont.innerHTML = `<tr><td colspan="5" class="text-center text-muted" style="padding:24px;">No hay promociones.</td></tr>`;
     return;
   }
   cont.innerHTML = promos.map(pr => `
     <tr>
+      <td>
+        ${pr.imagen
+          ? `<img src="${pr.imagen}" style="width:46px;height:46px;object-fit:cover;border-radius:8px;" onerror="this.style.display='none'">`
+          : `<span style="font-size:1.6rem;">🎁</span>`}
+      </td>
       <td><strong>${pr.titulo}</strong></td>
+      <td>${pr.precio ? formatPrecio(pr.precio) : '—'}</td>
       <td class="text-muted" style="font-size:0.82rem;">${pr.descripcion || ''}</td>
       <td>
         <div class="btn-group">
@@ -377,10 +384,13 @@ function cargarPromosAdmin() {
 
 function abrirModalPromo() {
   editandoPromoId = null;
+  imagenPromoActual = '';
   document.getElementById('modalPromoTitulo').textContent = '➕ Agregar promoción';
   document.getElementById('promoTitulo').value = '';
   document.getElementById('promoDesc').value   = '';
   document.getElementById('promoBadge').value  = '';
+  document.getElementById('promoPrecio').value = '';
+  document.getElementById('promoImagenPreview').innerHTML = '<span style="font-size:3rem;">🎁</span>';
   document.getElementById('modalPromo').classList.add('activo');
 }
 
@@ -388,10 +398,18 @@ function editarPromo(id) {
   const pr = getPromos().find(p => p.id === id);
   if (!pr) return;
   editandoPromoId = id;
+  imagenPromoActual = pr.imagen || '';
   document.getElementById('modalPromoTitulo').textContent = '✏️ Editar promoción';
   document.getElementById('promoTitulo').value = pr.titulo || '';
   document.getElementById('promoDesc').value   = pr.descripcion || '';
   document.getElementById('promoBadge').value  = pr.badge || '';
+  document.getElementById('promoPrecio').value = pr.precio || '';
+  const prev = document.getElementById('promoImagenPreview');
+  if (pr.imagen) {
+    prev.innerHTML = `<img src="${pr.imagen}" style="width:100%;height:100%;object-fit:cover;">`;
+  } else {
+    prev.innerHTML = '<span style="font-size:3rem;">🎁</span>';
+  }
   document.getElementById('modalPromo').classList.add('activo');
 }
 
@@ -399,13 +417,22 @@ function guardarPromo() {
   const titulo = document.getElementById('promoTitulo').value.trim();
   const desc   = document.getElementById('promoDesc').value.trim();
   const badge  = document.getElementById('promoBadge').value.trim();
+  const precio = parseFloat(document.getElementById('promoPrecio').value) || 0;
   if (!titulo) { toast('⚠️ El título es obligatorio'); return; }
   let promos = getPromos();
+  const nueva = {
+    id: editandoPromoId || uid(),
+    titulo,
+    descripcion: desc,
+    badge,
+    imagen: imagenPromoActual,
+    precio
+  };
   if (editandoPromoId) {
-    promos = promos.map(p => p.id === editandoPromoId ? { ...p, titulo, descripcion: desc, badge } : p);
+    promos = promos.map(p => p.id === editandoPromoId ? nueva : p);
     toast('✅ Promoción actualizada');
   } else {
-    promos.push({ id: uid(), titulo, descripcion: desc, badge });
+    promos.push(nueva);
     toast('✅ Promoción agregada');
   }
   setPromos(promos);
@@ -417,6 +444,29 @@ function eliminarPromo(id) {
   if (!confirm('¿Eliminar esta promoción?')) return;
   setPromos(getPromos().filter(p => p.id !== id));
   cargarPromosAdmin();
+}
+
+function quitarImagenPromo() {
+  imagenPromoActual = '';
+  document.getElementById('inputImgPromoGaleria').value = '';
+  document.getElementById('inputImgPromoCamara').value  = '';
+  const prev = document.getElementById('promoImagenPreview');
+  if (prev) prev.innerHTML = '<span style="font-size:3rem;">🎁</span>';
+}
+
+function procesarArchivoPromo(file) {
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    toast('⚠️ Imagen muy grande (máx 2 MB)');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    imagenPromoActual = e.target.result;
+    const prev = document.getElementById('promoImagenPreview');
+    prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+  };
+  reader.readAsDataURL(file);
 }
 
 /* ══════════════════════════════════════════
@@ -477,10 +527,19 @@ function completarPedido(id) {
 
 function abrirDrawerPedidos() {
   cargarPedidosAdmin();
-  document.getElementById('drawerPedidos')?.classList.add('abierto');
+  const panel = document.getElementById('drawerPedidos');
+  panel?.classList.add('abierto');
+  // Cierre automático a los 3 segundos
+  clearTimeout(panel._cierreAuto);
+  panel._cierreAuto = setTimeout(() => {
+    panel?.classList.remove('abierto');
+  }, 3000);
 }
+
 function cerrarDrawerPedidos() {
-  document.getElementById('drawerPedidos')?.classList.remove('abierto');
+  const panel = document.getElementById('drawerPedidos');
+  panel?.classList.remove('abierto');
+  clearTimeout(panel._cierreAuto);
 }
 
 /* ══════════════════════════════════════════
@@ -509,74 +568,71 @@ function getLinkTienda() {
   return window.location.href.replace('admin.html', 'index.html');
 }
 
-function getLinkGuia() {
-  return window.location.href.replace('admin.html', 'Guia_Rapida_DulzuraDelHogar.pdf');
-}
-
 function cargarLinkTienda() {
   const el = document.getElementById('linkTienda');
   if (el) el.value = getLinkTienda();
+  generarQRTienda();
 }
 
-function copiarLinkTienda() {
+function generarQRTienda() {
+  const wrap = document.getElementById('qrTiendaWrap');
+  const img  = document.getElementById('qrTiendaImg');
   const link = getLinkTienda();
-  navigator.clipboard.writeText(link).then(() => toast('📋 Link copiado'));
+  if (!wrap || !img) return;
+
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(link)}`;
+  img.src = qrUrl;
+  img.onload = () => { wrap.style.display = 'block'; };
+  img.onerror = () => { wrap.style.display = 'none'; };
 }
 
-function textoCompartir(link, nombre, incluirGuia) {
-  let txt = `🍰 *${nombre}*
-Artesanías y comidas caseras elaboradas con amor 💕
-
-Mirá nuestros productos acá 👇
-${link}`;
-  if (incluirGuia) {
-    txt += `
-
-📖 *Guía rápida para empezar:*
-${getLinkGuia()}`;
-  }
-  return txt;
-}
-
-function compartirWhatsApp(incluirGuia = false) {
+function descargarQR() {
   const link   = getLinkTienda();
-  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
-  const texto  = textoCompartir(link, nombre, incluirGuia);
-  // Abre WhatsApp genérico → en el cel muestra el selector de contactos
+  const nombre = (localStorage.getItem('app_nombre') || 'tienda').replace(/\s+/g, '-').toLowerCase();
+  const qrUrl  = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&margin=20&data=${encodeURIComponent(link)}`;
+  const a = document.createElement('a');
+  a.href     = qrUrl;
+  a.target   = '_blank';
+  a.download = `qr-${nombre}.png`;
+  a.click();
+}
+
+function compartirQRWhatsApp() {
+  const link   = getLinkTienda();
+  const nombre = localStorage.getItem('app_nombre') || 'mi tienda';
+  const texto  = `👗 *${nombre}*\n\nEscaneá este QR para ver todos los productos:\n${link}`;
   window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
 }
 
-function compartirEmail(incluirGuia = false) {
-  const link   = getLinkTienda();
-  const guia   = getLinkGuia();
-  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
-  const asunto = encodeURIComponent(`Te comparto ${nombre} 🍰`);
-  let cuerpo   = `¡Hola!\n\nTe comparto ${nombre}, una tienda de artesanías y comidas caseras elaboradas con amor.\n\n👉 Mirá los productos acá:\n${link}`;
-  if (incluirGuia) {
-    cuerpo += `\n\n📖 Y acá tenés la guía rápida para empezar:\n${guia}`;
-  }
-  cuerpo += `\n\n¡Espero que te guste! 🎂`;
-  window.location.href = `mailto:?subject=${asunto}&body=${encodeURIComponent(cuerpo)}`;
+function copiarLinkTienda() {
+  const el = document.getElementById('linkTienda');
+  if (!el) return;
+  navigator.clipboard.writeText(el.value).then(() => toast('📋 Link copiado'));
 }
 
-function compartirNativo(incluirGuia = false) {
+function compartirWhatsApp() {
   const link   = getLinkTienda();
   const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
-  const texto  = textoCompartir(link, nombre, incluirGuia);
+  const texto  = `🍰 *${nombre}*\nArtesanías y comidas caseras elaboradas con amor 💕\n\n👉 Mirá nuestros productos:\n${link}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+}
+
+function compartirEmail() {
+  const link   = getLinkTienda();
+  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
+  const asunto = `${nombre} — Tienda online`;
+  const cuerpo = `¡Hola!\nTe comparto ${nombre} 🍰\n\nLink: ${link}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+}
+
+function compartirNativo() {
+  const link   = getLinkTienda();
+  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
   if (navigator.share) {
-    navigator.share({ title: nombre, text: texto, url: link });
+    navigator.share({ title: nombre, text: nombre, url: link });
   } else {
-    navigator.clipboard.writeText(texto).then(() =>
-      toast('📋 Texto copiado — pegalo donde quieras compartirlo'));
+    navigator.clipboard.writeText(link).then(() => toast('📋 Link copiado'));
   }
-}
-
-function descargarGuia() {
-  const a = document.createElement('a');
-  a.href = 'Guia_Rapida_DulzuraDelHogar.pdf';
-  a.download = 'Guia_Rapida_DulzuraDelHogar.pdf';
-  a.click();
-  toast('📥 Descargando guía...');
 }
 
 /* ══════════════════════════════════════════
@@ -697,6 +753,14 @@ function configurarEventosAdmin() {
   // Promos
   document.getElementById('btnNuevaPromo')?.addEventListener('click', abrirModalPromo);
   document.getElementById('btnGuardarPromo')?.addEventListener('click', guardarPromo);
+
+  // Imagen de promo
+  document.getElementById('inputImgPromoGaleria')?.addEventListener('change', e => {
+    procesarArchivoPromo(e.target.files[0]);
+  });
+  document.getElementById('inputImgPromoCamara')?.addEventListener('change', e => {
+    procesarArchivoPromo(e.target.files[0]);
+  });
 
   // Pedidos / Drawer
   document.getElementById('bellBtn')?.addEventListener('click', abrirDrawerPedidos);
