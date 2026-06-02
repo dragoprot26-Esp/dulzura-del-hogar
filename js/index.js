@@ -85,23 +85,20 @@ function cargarProductos() {
   `).join('');
 }
 
-/* ── Render promociones (con imagen, precio y botón WhatsApp) ── */
+/* ── Render promociones ── */
 function cargarPromociones() {
   const cont = document.getElementById('contenidoPromos');
   if (!cont) return;
 
+  // Intentar cargar promos guardadas por el admin
   const promos = JSON.parse(localStorage.getItem('promos') || '[]');
-  const adminTel = (localStorage.getItem('admin_telefono') || '5491112345678').replace(/\D/g,'');
 
   if (promos.length > 0) {
     cont.innerHTML = promos.map(pr => `
       <div class="promo-card">
-        ${pr.imagen ? `<img src="${pr.imagen}" style="width:100%;height:120px;object-fit:cover;border-radius:8px;margin-bottom:10px;" onerror="this.style.display='none'">` : ''}
         ${pr.badge ? `<span class="promo-badge">${pr.badge}</span>` : ''}
         <div class="promo-titulo">${pr.titulo}</div>
         ${pr.descripcion ? `<p style="font-size:0.83rem;color:var(--text2);">${pr.descripcion}</p>` : ''}
-        ${pr.precio ? `<div style="font-weight:700;color:var(--primary);margin:6px 0;">${formatPrecio(pr.precio)}</div>` : ''}
-        <a href="https://wa.me/${adminTel}?text=${encodeURIComponent('Hola! Me interesa la promoción: ' + pr.titulo)}" target="_blank" class="btn btn-ghost btn-sm w-full" style="text-decoration:none;">📩 Consultar</a>
       </div>`).join('');
   } else {
     // Default si no hay promos creadas
@@ -126,19 +123,8 @@ function cargarPromociones() {
 
 /* ── Eventos ── */
 function setupEventosPublicos() {
-  document.getElementById('btnLoginAdmin')?.addEventListener('click', () => {
-    document.getElementById('modalLogin').classList.add('activo');
-    // Mostrar botón biometría solo si está disponible y registrado
-    const sepEl  = document.getElementById('separadorBiometria');
-    const btnBio = document.getElementById('btnBiometria');
-    if (biometriaDisponible() && biometriaRegistrada()) {
-      if (sepEl)  sepEl.style.display  = 'flex';
-      if (btnBio) btnBio.style.display = 'block';
-    } else {
-      if (sepEl)  sepEl.style.display  = 'none';
-      if (btnBio) btnBio.style.display = 'none';
-    }
-  });
+  document.getElementById('btnLoginAdmin')?.addEventListener('click', () =>
+    document.getElementById('modalLogin').classList.add('activo'));
 
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.modal-overlay').classList.remove('activo'));
@@ -149,7 +135,6 @@ function setupEventosPublicos() {
 
   document.getElementById('loginBtn')?.addEventListener('click', intentarLogin);
   document.getElementById('loginPass')?.addEventListener('keydown', e => { if (e.key === 'Enter') intentarLogin(); });
-  document.getElementById('btnBiometria')?.addEventListener('click', intentarLoginBiometrico);
 
   document.getElementById('recuperarBtn')?.addEventListener('click', () => {
     const email = prompt('Ingresá el correo del administrador:');
@@ -186,31 +171,6 @@ function intentarLogin() {
   } else {
     mostrarError(errEl, '⚠️ Usuario o contraseña incorrectos.');
     document.getElementById('loginPass').value = '';
-  }
-}
-
-async function intentarLoginBiometrico() {
-  const errEl = document.getElementById('loginError');
-  if (!biometriaDisponible()) {
-    mostrarError(errEl, '⚠️ Tu dispositivo no soporta autenticación biométrica.');
-    return;
-  }
-  if (!biometriaRegistrada()) {
-    mostrarError(errEl, '⚠️ No hay biometría registrada. Ingresá primero con usuario y contraseña y activala desde el panel.');
-    return;
-  }
-  try {
-    const ok = await verificarBiometria();
-    if (ok) {
-      if (!obtenerLicencia()) crearLicenciaTemporal();
-      sessionStorage.setItem('admin_logged', 'true');
-      document.getElementById('modalLogin').classList.remove('activo');
-      window.location.href = 'admin.html';
-    } else {
-      mostrarError(errEl, '⚠️ No se pudo verificar tu identidad. Intentá de nuevo.');
-    }
-  } catch (e) {
-    mostrarError(errEl, '⚠️ Autenticación cancelada.');
   }
 }
 

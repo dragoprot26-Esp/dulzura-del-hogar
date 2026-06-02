@@ -89,21 +89,18 @@ function recuperarAdmin(email) {
   }
   const pass = atob(localStorage.getItem('admin_pass'));
 
-  // Solo intenta enviar si EmailJS está presente y configurado
-  if (typeof emailjs !== 'undefined' && EMAILJS_SERVICE_ID !== 'TU_SERVICE_ID') {
+  if (typeof emailjs !== 'undefined') {
     emailjs.init(EMAILJS_PUBLIC_KEY);
     emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
       to_email: email,
       message: 'Tu contraseña de Dulzura del Hogar es: ' + pass
     }).then(() => {
       alert('✅ Contraseña enviada a ' + email);
-    }).catch((err) => {
-      console.error('EmailJS:', err);
-      alert('⚠️ No se pudo enviar el correo. Revisá la configuración de EmailJS.');
+    }).catch(() => {
+      alert('⚠️ No se pudo enviar el correo. Verificá la configuración de EmailJS.');
     });
   } else {
-    // No exponer contraseña si el servicio no está activo
-    alert('⚠️ EmailJS no configurado. Contactá al proveedor para recuperar tu contraseña.');
+    alert('EmailJS no está configurado. Tu contraseña es: ' + pass);
   }
 }
 

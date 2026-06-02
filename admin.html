@@ -40,7 +40,6 @@
       <li><a href="#" data-sec="secTemas">🎨 Apariencia</a></li>
       <li><a href="#" data-sec="secLicencia">🔑 Licencia</a></li>
       <li><a href="#" data-sec="secCuenta">👤 Mi cuenta</a></li>
-      <li><a href="#" data-sec="secGuia">📘 Guía rápida</a></li>
     </ul>
   </aside>
 
@@ -107,9 +106,7 @@
           <table class="tabla-admin">
             <thead>
               <tr>
-                <th>Imagen</th>
                 <th>Título</th>
-                <th>Precio</th>
                 <th>Descripción</th>
                 <th>Acciones</th>
               </tr>
@@ -233,25 +230,6 @@
           Contacto proveedor: <a href="mailto:dragoprot26@gmail.com" style="color:var(--primary);">dragoprot26@gmail.com</a>
         </p>
       </div>
-
-      <!-- ── BIOMETRÍA ── -->
-      <div class="panel-card" style="margin-top:16px;">
-        <div class="panel-card-header">
-          <h3 class="panel-card-title">🔒 Acceso biométrico</h3>
-        </div>
-        <p class="text-muted mb-3" style="font-size:0.88rem;">
-          Ingresá al panel con la huella dactilar, PIN o patrón de tu dispositivo, sin escribir contraseña cada vez.
-        </p>
-        <div id="biometriaEstado" class="licencia-estado licencia-warning" style="margin-bottom:14px;">
-          🔄 Verificando disponibilidad...
-        </div>
-        <button class="btn btn-primary" id="btnRegistrarBiometria" style="display:none;">
-          👆 Activar biometría / PIN
-        </button>
-        <button class="btn btn-outline" id="btnDesactivarBiometria" style="display:none;margin-top:8px;">
-          🗑️ Desactivar biometría
-        </button>
-      </div>
     </section>
 
     <!-- ═══ MI CUENTA ═══ -->
@@ -283,20 +261,45 @@
         <div class="panel-card-header">
           <h3 class="panel-card-title">🔗 Compartir mi tienda</h3>
         </div>
-        <p class="text-muted mb-3">Compartí el link de tu tienda con clientes nuevos.</p>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-          <input type="text" id="linkTienda" readonly style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:0.85rem;min-width:0;">
+        <p class="text-muted mb-3">Compartí el link de tu tienda con clientes o interesados en la app.</p>
+
+        <!-- Link copiable -->
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+          <input type="text" id="linkTienda" readonly style="flex:1;padding:10px 14px;border:2px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:0.83rem;min-width:0;">
           <button class="btn btn-ghost btn-sm" onclick="copiarLinkTienda()">📋 Copiar</button>
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-          <button class="btn btn-primary" onclick="compartirWhatsApp()" style="background:#25D366;flex:1;min-width:140px;">
+
+        <!-- Solo la tienda -->
+        <p style="font-size:0.78rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;">Solo el link de la tienda</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;">
+          <button class="btn btn-primary btn-sm" onclick="compartirWhatsApp(false)" style="background:#25D366;">
             📱 WhatsApp
           </button>
-          <button class="btn btn-primary" onclick="compartirEmail()" style="flex:1;min-width:140px;">
-            ✉️ Correo electrónico
+          <button class="btn btn-primary btn-sm" onclick="compartirEmail(false)">
+            ✉️ Correo
           </button>
-          <button class="btn btn-ghost" onclick="compartirNativo()" style="flex:1;min-width:140px;">
+          <button class="btn btn-ghost btn-sm" onclick="compartirNativo(false)">
             🔗 Más opciones
+          </button>
+        </div>
+
+        <!-- Con guía rápida (referido) -->
+        <div style="background:var(--primary-light);border-radius:12px;padding:14px 16px;">
+          <p style="font-size:0.78rem;font-weight:700;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px;">📖 Incluir Guía Rápida (para referidos)</p>
+          <p style="font-size:0.82rem;color:var(--text2);margin-bottom:10px;">Enviá el link de la tienda <strong>y</strong> la guía PDF para que el nuevo usuario arranque solo.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <button class="btn btn-primary btn-sm" onclick="compartirWhatsApp(true)" style="background:#25D366;">
+              📱 WhatsApp + Guía
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="compartirEmail(true)">
+              ✉️ Correo + Guía
+            </button>
+            <button class="btn btn-ghost btn-sm" onclick="compartirNativo(true)">
+              🔗 Más + Guía
+            </button>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="descargarGuia()" style="width:100%;justify-content:center;">
+            📥 Descargar guía PDF
           </button>
         </div>
       </div>
@@ -321,21 +324,6 @@
         <button class="btn btn-ghost" id="btnCambiarPass">🔑 Cambiar contraseña</button>
       </div>
 
-    </section>
-
-    <!-- ═══ GUÍA RÁPIDA ═══ -->
-    <section class="admin-section" id="secGuia">
-      <div class="panel-card">
-        <h3 class="panel-card-title">📘 Guía rápida de Dulzura del Hogar</h3>
-        <ol style="line-height:1.8;font-size:0.9rem;color:var(--text2);">
-          <li><strong>Agregá productos</strong> desde la sección "📦 Productos". Poné nombre, precio, imagen y detalle.</li>
-          <li><strong>Creá promociones</strong> en "🎁 Promociones" para destacar ofertas. Podés subir imágenes y un precio opcional.</li>
-          <li><strong>Gestioná encargos</strong> en "🛒 Pedidos". Recibís cada pedido y podés marcarlo como completado.</li>
-          <li><strong>Personalizá la tienda</strong> en "🎨 Apariencia". Cambiá colores, logo y nombre.</li>
-          <li><strong>Compartí tu tienda</strong> desde "👤 Mi cuenta → Compartir mi tienda". Enviá el link a tus clientes por WhatsApp o email.</li>
-          <li><strong>Consultas y licencias</strong> en "🔑 Licencia" o escribí a <a href="mailto:dragoprot26@gmail.com">dragoprot26@gmail.com</a>.</li>
-        </ol>
-      </div>
     </section>
 
   </main>
@@ -368,17 +356,34 @@
     <!-- ── Imagen: galería/cámara O url ── -->
     <div class="form-group">
       <label>Imagen del producto</label>
+
+      <!-- Preview -->
       <div id="prodImagenPreview" style="width:100%;height:150px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:3rem;margin-bottom:10px;overflow:hidden;border:2px dashed var(--border);">
         🍬
       </div>
+
+      <!-- Botones de carga -->
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgGaleria').click()">🖼️ Galería / PC</button>
-        <button type="button" class="btn btn-ghost btn-sm" id="btnCamara" onclick="document.getElementById('inputImgCamara').click()">📷 Cámara</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleUrlImagen()">🌐 URL web</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="quitarImagenProducto()">✕ Quitar</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgGaleria').click()">
+          🖼️ Galería / PC
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="btnCamara" onclick="document.getElementById('inputImgCamara').click()">
+          📷 Cámara
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleUrlImagen()">
+          🌐 URL web
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="quitarImagenProducto()">
+          ✕ Quitar
+        </button>
       </div>
+
+      <!-- Input archivo galería -->
       <input type="file" id="inputImgGaleria" accept="image/*" style="display:none;">
+      <!-- Input cámara (capture=environment = cámara trasera en móvil) -->
       <input type="file" id="inputImgCamara" accept="image/*" capture="environment" style="display:none;">
+
+      <!-- Campo URL (oculto por defecto) -->
       <div id="urlImagenWrap" style="display:none;">
         <input type="url" id="prodImagen" placeholder="https://... URL de imagen web"
           oninput="previsualizarUrlImagen(this.value)"
@@ -402,9 +407,9 @@
   </div>
 </div>
 
-<!-- ===== MODAL PROMO (MEJORADO) ===== -->
+<!-- ===== MODAL PROMO ===== -->
 <div class="modal-overlay" id="modalPromo">
-  <div class="modal" style="max-width:520px;">
+  <div class="modal">
     <button class="modal-close" aria-label="Cerrar">✕</button>
     <h2 class="modal-titulo" id="modalPromoTitulo">Promoción</h2>
     <div class="form-group">
@@ -414,26 +419,6 @@
     <div class="form-group">
       <label for="promoBadge">Etiqueta</label>
       <input type="text" id="promoBadge" placeholder="Ej: 🎉 Especial">
-    </div>
-
-    <!-- Imagen de la promo -->
-    <div class="form-group">
-      <label>Imagen (opcional)</label>
-      <div id="promoImagenPreview" style="width:100%;height:150px;border-radius:12px;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:3rem;margin-bottom:10px;overflow:hidden;border:2px dashed var(--border);">
-        🎁
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgPromoGaleria').click()">🖼️ Galería / PC</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('inputImgPromoCamara').click()">📷 Cámara</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="quitarImagenPromo()">✕ Quitar</button>
-      </div>
-      <input type="file" id="inputImgPromoGaleria" accept="image/*" style="display:none;">
-      <input type="file" id="inputImgPromoCamara" accept="image/*" capture="environment" style="display:none;">
-    </div>
-
-    <div class="form-group">
-      <label for="promoPrecio">Precio (opcional)</label>
-      <input type="number" id="promoPrecio" placeholder="Ej: 2500" min="0">
     </div>
     <div class="form-group">
       <label for="promoDesc">Descripción</label>
