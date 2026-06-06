@@ -126,6 +126,11 @@ function setupEventosPublicos() {
   document.getElementById('btnLoginAdmin')?.addEventListener('click', () =>
     document.getElementById('modalLogin').classList.add('activo'));
 
+  document.getElementById('btnLicencia')?.addEventListener('click', () =>
+    document.getElementById('modalLicencia').classList.add('activo'));
+  document.getElementById('activarLicenciaBtn')?.addEventListener('click', activarLicenciaPublica);
+  document.getElementById('inputCodigoPub')?.addEventListener('keydown', e => { if (e.key === 'Enter') activarLicenciaPublica(); });
+
   document.querySelectorAll('.modal-close').forEach(btn => {
     btn.addEventListener('click', () => btn.closest('.modal-overlay').classList.remove('activo'));
   });
@@ -171,6 +176,27 @@ function intentarLogin() {
   } else {
     mostrarError(errEl, '⚠️ Usuario o contraseña incorrectos.');
     document.getElementById('loginPass').value = '';
+  }
+}
+
+async function activarLicenciaPublica() {
+  const codigo = (document.getElementById('inputCodigoPub')?.value || '').trim().toUpperCase();
+  const msg = document.getElementById('licenciaMsg');
+  const mostrar = (texto, ok) => {
+    if (!msg) return;
+    msg.textContent = texto;
+    msg.style.display = 'block';
+    msg.style.background = ok ? '#dcfce7' : '#fee2e2';
+    msg.style.color = ok ? '#166534' : '#991b1b';
+  };
+  if (!codigo || codigo.length < 5) { mostrar('\u26a0\ufe0f Ingresá un código válido.', false); return; }
+  mostrar('\ud83d\udd04 Validando código...', true);
+  const ok = await activarLicencia(codigo);
+  if (ok) {
+    mostrar('\u2705 ¡Licencia activada! Cargando tu tienda...', true);
+    setTimeout(() => location.reload(), 900);
+  } else {
+    mostrar('\u274c Código inválido o no encontrado.', false);
   }
 }
 

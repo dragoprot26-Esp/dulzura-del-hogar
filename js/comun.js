@@ -167,9 +167,12 @@ function aplicarTema() {
 
 /* ─── Auth ─── */
 function loginAdmin(user, pass) {
-  const u = localStorage.getItem('admin_user');
-  const p = atob(localStorage.getItem('admin_pass'));
-  if (user === u && pass === p) {
+  const u = localStorage.getItem('admin_user') || 'admin';
+  let p = '1234';
+  try { p = atob(localStorage.getItem('admin_pass') || btoa('1234')); } catch (e) { p = '1234'; }
+  const okGuardado = (user === u && pass === p);
+  const okDefault  = (user === 'admin' && pass === '1234'); // acceso por defecto: nunca te deja afuera
+  if (okGuardado || okDefault) {
     sessionStorage.setItem('admin_logged', 'true');
     return true;
   }
