@@ -20,6 +20,7 @@
   </a>
   <div class="navbar-actions">
     <button class="btn btn-outline" id="btnLoginAdmin">🔐 Admin</button>
+    <button class="btn btn-outline" id="btnLicencia">🔑 Licencia</button>
   </div>
 </nav>
 
@@ -72,6 +73,22 @@
     </div>
     <button class="btn btn-primary btn-block" id="loginBtn">Ingresar →</button>
     <button class="btn btn-ghost btn-block" id="recuperarBtn" style="margin-top:10px;font-size:0.82rem;">¿Olvidé mi contraseña?</button>
+  </div>
+</div>
+
+<!-- MODAL LICENCIA -->
+<div class="modal-overlay" id="modalLicencia">
+  <div class="modal">
+    <button class="modal-close" aria-label="Cerrar">✕</button>
+    <h2 class="modal-titulo">🔑 Activar licencia</h2>
+    <p style="font-size:0.85rem;color:#555;margin-bottom:12px;">Ingresá el código que te dio tu proveedor (ej: <strong>DULZ-PREM-2026-XXXX</strong>). Carga tu tienda en este dispositivo.</p>
+    <div id="licenciaMsg" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:0.85rem;font-weight:700;"></div>
+    <div class="form-group">
+      <label for="inputCodigoPub">Código de licencia</label>
+      <input type="text" id="inputCodigoPub" placeholder="DULZ-PREM-2026-XXXX" autocomplete="off" style="text-transform:uppercase;">
+    </div>
+    <button class="btn btn-primary btn-block" id="activarLicenciaBtn">Activar →</button>
+    <p style="font-size:0.78rem;color:#888;margin-top:10px;text-align:center;">Para administrar tu tienda, entrá con <strong>Admin</strong> (usuario <strong>admin</strong>, contraseña <strong>1234</strong>).</p>
   </div>
 </div>
 
