@@ -4,6 +4,111 @@ const EMAILJS_SERVICE_ID  = 'TU_SERVICE_ID';    // ← reemplazar
 const EMAILJS_TEMPLATE_ID = 'TU_TEMPLATE_ID';   // ← reemplazar
 const EMAILJS_PUBLIC_KEY  = 'TU_PUBLIC_KEY';     // ← reemplazar
 
+/* =====================================================================
+   SUPABASE (CyC Admin v2 — base nueva)
+   Config compartida: la usa también licencia.js
+   ===================================================================== */
+const SB_URL = 'https://pcxlhgdpxfuybzfsquem.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeGxoZ2RweGZ1eWJ6ZnNxdWVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDIyOTQsImV4cCI6MjA5NjE3ODI5NH0.HJWpFO8TkRsmUx15GtSsUusjvVEhUsi5b_QGoPoPU00';
+
+/* =====================================================================
+   SYNC MULTI-INQUILINO  (igual idea que SalonPro: 1 fila por inquilino)
+   Cada licencia (codigo) tiene su propia "tienda" en la nube.
+   Tabla: dulzura_backups  (tenant_id, datos, updated_at)
+   ===================================================================== */
+const DULZURA_SYNC_KEYS = [
+  'productos', 'pedidos', 'promos',
+  'app_nombre', 'app_emoji', 'app_logo',
+  'admin_nombre', 'admin_email', 'admin_telefono',
+  'tema'
+];
+
+let _dulzuraPush = false;          // recién se habilita después de hidratar de la nube
+let _dulzuraTimer = null;
+
+// Guardamos la versión original de setItem para escribir SIN disparar sync
+const _origSetItem = localStorage.setItem.bind(localStorage);
+
+// Código de licencia = tenant_id. Ignoramos el código de prueba genérico.
+function _dulzuraCodigo() {
+  try {
+    const lic = JSON.parse(localStorage.getItem('dulzura_licencia') || 'null');
+    const c = lic && lic.codigo ? lic.codigo : null;
+    if (!c || c === 'TRIAL-15') return null;  // sin licencia real → todo local
+    return c;
+  } catch (e) { return null; }
+}
+
+function dulzuraHabilitarSync() { _dulzuraPush = true; }
+
+function _dulzuraDebounce() {
+  if (_dulzuraTimer) clearTimeout(_dulzuraTimer);
+  _dulzuraTimer = setTimeout(dulzuraNubeGuardar, 800);
+}
+
+// Sube el estado actual (todos los datos del inquilino) a la nube
+async function dulzuraNubeGuardar() {
+  if (!_dulzuraPush) return;
+  const codigo = _dulzuraCodigo();
+  if (!codigo) return;
+  const datos = {};
+  DULZURA_SYNC_KEYS.forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v !== null) datos[k] = v;
+  });
+  try {
+    await fetch(`${SB_URL}/rest/v1/dulzura_backups`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ tenant_id: codigo, datos, updated_at: new Date().toISOString() })
+    });
+  } catch (e) { console.warn('[Dulzura] No se pudo subir a la nube:', e); }
+}
+
+// Baja los datos del inquilino desde la nube y los escribe en localStorage
+async function dulzuraNubeCargar() {
+  const codigo = _dulzuraCodigo();
+  if (!codigo) return { hydrated: false, changed: false };
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1`,
+      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
+    );
+    if (res.ok) {
+      const rows = await res.json();
+      if (rows && rows.length && rows[0].datos) {
+        const datos = rows[0].datos;
+        let changed = false;
+        Object.keys(datos).forEach(k => {
+          if (DULZURA_SYNC_KEYS.includes(k)) {
+            if (localStorage.getItem(k) !== datos[k]) changed = true;
+            _origSetItem(k, datos[k]); // escribir sin disparar push
+          }
+        });
+        return { hydrated: true, changed };
+      }
+    }
+    // Inquilino nuevo sin datos en la nube: subimos lo local como base inicial
+    _dulzuraPush = true;
+    await dulzuraNubeGuardar();
+    return { hydrated: true, changed: false };
+  } catch (e) {
+    console.warn('[Dulzura] No se pudo bajar de la nube:', e);
+    return { hydrated: false, changed: false };
+  }
+}
+
+// Interceptar TODOS los guardados (productos, promos, perfil, tema...) sin tocar admin.js
+localStorage.setItem = function (k, v) {
+  _origSetItem(k, v);
+  if (_dulzuraPush && DULZURA_SYNC_KEYS.includes(k)) _dulzuraDebounce();
+};
+
 /* ─── Datos de ejemplo ─── */
 const PRODUCTOS_INICIALES = [
   {
@@ -137,3 +242,14 @@ function formatFecha(ts) {
 /* ─── Inicializar al cargar ─── */
 inicializarDatos();
 aplicarTema();
+
+/* ─── Hidratar desde la nube (1 sola vez por sesión) ─── */
+(async function dulzuraHidratarInicial() {
+  const codigo = _dulzuraCodigo();
+  if (!codigo) { _dulzuraPush = false; return; }            // sin licencia real → todo local
+  if (sessionStorage.getItem('dulzura_hidratado') === '1') { _dulzuraPush = true; return; }
+  const r = await dulzuraNubeCargar();
+  sessionStorage.setItem('dulzura_hidratado', '1');
+  _dulzuraPush = true;
+  if (r && r.changed) location.reload(); // refrescar para mostrar los datos de la nube
+})();

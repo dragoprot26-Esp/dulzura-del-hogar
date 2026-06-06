@@ -4,9 +4,7 @@ const CLAVE_LICENCIA   = 'dulzura_licencia';
 const PROVEEDOR_MAIL   = 'dragoprot26@gmail.com';
 const APP_ID           = 'dulzurahogar';   // Prefijo CyC Admin: DULZ-PREM-2026-XXXX
 
-// ─── Supabase (mismo backend que CyC Admin) ───
-const SB_URL = 'https://upoexzjltapiuijhszzk.supabase.co';
-const SB_KEY = 'sb_publishable_Ll8-8exzAJBQYqC4YQdflg_7qvjjakP';
+// ─── Supabase: SB_URL y SB_KEY están definidos en comun.js (CyC Admin v2, base nueva) ───
 
 async function sbGetLicencia(codigo) {
   try {
@@ -111,6 +109,17 @@ async function activarLicencia(codigo) {
       usuario: remote.usuario_admin || ''
     };
     guardarLicencia(lic);
+
+    // Multi-inquilino: traer los datos de ESTE inquilino desde la nube
+    try {
+      sessionStorage.removeItem('dulzura_hidratado');
+      if (typeof dulzuraNubeCargar === 'function') {
+        await dulzuraNubeCargar();
+        sessionStorage.setItem('dulzura_hidratado', '1');
+        dulzuraHabilitarSync();
+      }
+    } catch (e) { console.warn('hidratación nube:', e); }
+
     return true;
   }
 
