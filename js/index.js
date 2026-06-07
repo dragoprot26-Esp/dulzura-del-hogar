@@ -1,6 +1,45 @@
 /* ===== index.js — Dulzura del Hogar (página pública) ===== */
 
-document.addEventListener('DOMContentLoaded', () => {
+/* En modo tienda pública (?tienda=CODIGO) los datos salen de la nube,
+   no del localStorage de quien mira. Así el cliente ve la tienda del inquilino. */
+let _tiendaData = null;
+
+function _dGet(key, def) {
+  if (_tiendaData) {
+    const v = _tiendaData[key];
+    return (v !== undefined && v !== null) ? v : (def || '');
+  }
+  const v = localStorage.getItem(key);
+  return (v !== null && v !== undefined) ? v : (def || '');
+}
+function _dProductos() {
+  if (_tiendaData) { try { return JSON.parse(_tiendaData.productos || '[]'); } catch (e) { return []; } }
+  return getProductos();
+}
+function _dPromos() {
+  if (_tiendaData) { try { return JSON.parse(_tiendaData.promos || '[]'); } catch (e) { return []; } }
+  return JSON.parse(localStorage.getItem('promos') || '[]');
+}
+
+async function cargarTiendaPublica(codigo) {
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+    );
+    let rows = [];
+    if (res.ok) rows = await res.json();
+    _tiendaData = (rows && rows.length && rows[0].datos) ? rows[0].datos : {};
+  } catch (e) { console.warn('tienda pública:', e); _tiendaData = {}; }
+  // En modo público ocultamos los botones del dueño (Admin / Licencia)
+  ['btnLoginAdmin', 'btnLicencia'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const codigoTienda = new URLSearchParams(location.search).get('tienda');
+  if (codigoTienda) await cargarTiendaPublica(codigoTienda);
   aplicarApariencia();
   cargarProductos();
   cargarPromociones();
@@ -10,9 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 /* ── Apariencia (logo + nombre guardado por el admin) ── */
 function aplicarApariencia() {
-  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
-  const emoji  = localStorage.getItem('app_emoji')  || '🍰';
-  const logo   = localStorage.getItem('app_logo')   || '';
+  const nombre = _dGet('app_nombre', 'Dulzura del Hogar');
+  const emoji  = _dGet('app_emoji', '🍰');
+  const logo   = _dGet('app_logo', '');
 
   // Navbar
   const nameEl  = document.getElementById('navNombreApp');
@@ -45,8 +84,8 @@ function aplicarApariencia() {
 
 /* ── Footer dinámico ── */
 function cargarFooter() {
-  const tel   = localStorage.getItem('admin_telefono') || '5491112345678';
-  const email = localStorage.getItem('admin_email')    || 'contacto@dulzurahogar.com';
+  const tel   = _dGet('admin_telefono', '5491112345678');
+  const email = _dGet('admin_email', 'contacto@dulzurahogar.com');
   const linkWA   = document.getElementById('linkWA');
   const linkMail = document.getElementById('linkMail');
   if (linkWA)   linkWA.href   = `https://wa.me/${tel.replace(/\D/g,'')}`;
@@ -57,7 +96,7 @@ function cargarFooter() {
 function cargarProductos() {
   const cont = document.getElementById('productos');
   if (!cont) return;
-  const prods = getProductos();
+  const prods = _dProductos();
   if (prods.length === 0) {
     cont.innerHTML = `<div class="text-center text-muted" style="padding:40px;grid-column:1/-1;">
       <div style="font-size:2.5rem;margin-bottom:8px;">🍰</div>
@@ -90,8 +129,8 @@ function cargarPromociones() {
   const cont = document.getElementById('contenidoPromos');
   if (!cont) return;
 
-  // Intentar cargar promos guardadas por el admin
-  const promos = JSON.parse(localStorage.getItem('promos') || '[]');
+  // Promos del inquilino (nube en modo público, localStorage en el dueño)
+  const promos = _dPromos();
 
   if (promos.length > 0) {
     cont.innerHTML = promos.map(pr => `
@@ -100,6 +139,9 @@ function cargarPromociones() {
         <div class="promo-titulo">${pr.titulo}</div>
         ${pr.descripcion ? `<p style="font-size:0.83rem;color:var(--text2);">${pr.descripcion}</p>` : ''}
       </div>`).join('');
+  } else if (_tiendaData) {
+    // Tienda pública sin promos: no mostramos las genéricas
+    cont.innerHTML = '';
   } else {
     // Default si no hay promos creadas
     cont.innerHTML = `
@@ -149,7 +191,7 @@ function setupEventosPublicos() {
   document.getElementById('productos')?.addEventListener('click', e => {
     const btn = e.target.closest('.btn-encargar');
     if (!btn) return;
-    const prod = getProductos().find(p => p.id === btn.dataset.id);
+    const prod = _dProductos().find(p => p.id === btn.dataset.id);
     if (!prod) return;
     document.getElementById('pedidoProductoId').value    = prod.id;
     document.getElementById('pedidoProductoNombre').textContent = prod.nombre;
@@ -193,8 +235,12 @@ async function activarLicenciaPublica() {
   mostrar('\ud83d\udd04 Validando código...', true);
   const ok = await activarLicencia(codigo);
   if (ok) {
-    mostrar('\u2705 ¡Licencia activada! Cargando tu tienda...', true);
-    setTimeout(() => location.reload(), 900);
+    let usuario = '';
+    try { usuario = (obtenerLicencia() || {}).usuario || ''; } catch (e) {}
+    const cred = usuario
+      ? '\u2705 ¡Licencia activada! Entrá en \ud83d\udd10 Admin con el usuario \u00ab' + usuario + '\u00bb y la contraseña que te dimos con la licencia. (También funciona admin / 1234.)'
+      : '\u2705 ¡Licencia activada! Entrá en \ud83d\udd10 Admin con las credenciales de tu licencia. (También funciona admin / 1234.)';
+    mostrar(cred, true);
   } else {
     mostrar('\u274c Código inválido o no encontrado.', false);
   }
@@ -210,7 +256,7 @@ function enviarPedido() {
 
   if (!nombre || !telefono) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
 
-  const prod = getProductos().find(p => p.id === prodId);
+  const prod = _dProductos().find(p => p.id === prodId);
   if (!prod) return;
 
   const pedido = {
@@ -218,15 +264,18 @@ function enviarPedido() {
     precio: prod.precio, cantidad, total: prod.precio * cantidad,
     comprador: nombre, telefono, direccion, fecha: Date.now(), estado: 'pendiente'
   };
-  const pedidos = getPedidos();
-  pedidos.push(pedido);
-  setPedidos(pedidos);
+  // Solo guardamos el pedido localmente cuando es el propio dueño (no en la tienda pública)
+  if (!_tiendaData) {
+    const pedidos = getPedidos();
+    pedidos.push(pedido);
+    setPedidos(pedidos);
+  }
 
   document.getElementById('modalPedido').classList.remove('activo');
 
-  // Notificar al admin por WhatsApp si hay teléfono configurado
-  const adminTel = localStorage.getItem('admin_telefono');
-  const appNombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
+  // Avisar por WhatsApp al teléfono del inquilino
+  const adminTel = _dGet('admin_telefono', '');
+  const appNombre = _dGet('app_nombre', 'Dulzura del Hogar');
   if (adminTel) {
     const msg = `🍰 *Nuevo encargo — ${appNombre}*\n\n👤 *Cliente:* ${nombre}\n📱 *Teléfono:* ${telefono}\n🛍️ *Producto:* ${prod.nombre} × ${cantidad}\n💰 *Total:* ${formatPrecio(prod.precio * cantidad)}${direccion ? '\n📍 *Dirección:* ' + direccion : ''}`;
     window.open(`https://wa.me/${adminTel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
