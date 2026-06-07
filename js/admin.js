@@ -20,9 +20,9 @@ document.addEventListener('DOMContentLoaded', () => {
   mostrarInfoLicencia();
   cargarLinkTienda();
   mostrarBienvenida();
-  // Avisos de encargos en vivo: revisa la nube cada 20 s
+  // Avisos de encargos en vivo: revisa la nube cada 30 s
   setTimeout(refrescarPedidosNube, 3000);
-  setInterval(refrescarPedidosNube, 20000);
+  setInterval(refrescarPedidosNube, 30000);
 });
 
 /* ─── Encargos nuevos desde la nube (campanita en vivo) ─── */
@@ -32,8 +32,8 @@ async function refrescarPedidosNube() {
   if (!codigo || codigo === 'TRIAL-15') return;
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1&_ts=${Date.now()}`,
+      { cache: 'no-store', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Cache-Control': 'no-cache' } }
     );
     if (!res.ok) return;
     const rows = await res.json();
