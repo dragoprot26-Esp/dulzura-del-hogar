@@ -4,6 +4,7 @@
    no del localStorage de quien mira. Así el cliente ve la tienda del inquilino. */
 let _tiendaData = null;
 let _tiendaCodigo = null;
+let _pedidoActual = null;   // {productoId, producto, precio} — vale para productos y promos
 
 function _dGet(key, def) {
   if (_tiendaData) {
@@ -141,6 +142,8 @@ function cargarPromociones() {
         ${pr.badge ? `<span class="promo-badge">${pr.badge}</span>` : ''}
         <div class="promo-titulo">${pr.titulo}</div>
         ${pr.descripcion ? `<p style="font-size:0.83rem;color:var(--text2);">${pr.descripcion}</p>` : ''}
+        ${pr.precio ? `<div style="font-weight:700;color:var(--primary-dark);margin-top:4px;">${formatPrecio(pr.precio)}</div>` : ''}
+        <button class="btn btn-primary promo-encargar" data-id="${pr.id}" data-titulo="${pr.titulo}" data-precio="${pr.precio || 0}" style="margin-top:8px;width:100%;font-size:0.85rem;padding:8px;">🛒 Encargar</button>
       </div>`).join('');
   } else if (_tiendaData) {
     // Tienda pública sin promos: no mostramos las genéricas
@@ -199,17 +202,28 @@ function setupEventosPublicos() {
     if (!btn) return;
     const prod = _dProductos().find(p => p.id === btn.dataset.id);
     if (!prod) return;
-    document.getElementById('pedidoProductoId').value    = prod.id;
-    document.getElementById('pedidoProductoNombre').textContent = prod.nombre;
-    document.getElementById('pedidoPrecio').textContent  = formatPrecio(prod.precio);
-    ['pedidoNombre','pedidoTelefono','pedidoDireccion'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.value = '';
-    });
-    document.getElementById('pedidoCantidad').value = 1;
-    document.getElementById('modalPedido').classList.add('activo');
+    abrirPedidoItem(prod.id, prod.nombre, prod.precio);
+  });
+
+  document.getElementById('contenidoPromos')?.addEventListener('click', e => {
+    const btn = e.target.closest('.promo-encargar');
+    if (!btn) return;
+    abrirPedidoItem('promo-' + btn.dataset.id, '🎁 ' + btn.dataset.titulo, parseFloat(btn.dataset.precio) || 0);
   });
 
   document.getElementById('enviarPedido')?.addEventListener('click', enviarPedido);
+}
+
+function abrirPedidoItem(id, nombre, precio) {
+  _pedidoActual = { productoId: id, producto: nombre, precio: precio || 0 };
+  document.getElementById('pedidoProductoId').value = id;
+  document.getElementById('pedidoProductoNombre').textContent = nombre;
+  document.getElementById('pedidoPrecio').textContent = precio ? formatPrecio(precio) : 'A coordinar';
+  ['pedidoNombre','pedidoTelefono','pedidoDireccion'].forEach(i => {
+    const el = document.getElementById(i); if (el) el.value = '';
+  });
+  document.getElementById('pedidoCantidad').value = 1;
+  document.getElementById('modalPedido').classList.add('activo');
 }
 
 function intentarLogin() {
@@ -268,12 +282,13 @@ function enviarPedido() {
 
   if (!nombre || !telefono) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
 
-  const prod = _dProductos().find(p => p.id === prodId);
-  if (!prod) return;
+  const item = _pedidoActual;
+  if (!item) return;
+  const precio = item.precio || 0;
 
   const pedido = {
-    id: uid(), productoId: prodId, producto: prod.nombre,
-    precio: prod.precio, cantidad, total: prod.precio * cantidad,
+    id: uid(), productoId: item.productoId, producto: item.producto,
+    precio: precio, cantidad, total: precio * cantidad,
     comprador: nombre, telefono, direccion, fecha: Date.now(), estado: 'pendiente'
   };
   // Solo guardamos el pedido localmente cuando es el propio dueño (no en la tienda pública)
@@ -292,7 +307,8 @@ function enviarPedido() {
   const adminTel = _dGet('admin_telefono', '');
   const appNombre = _dGet('app_nombre', 'Dulzura del Hogar');
   if (adminTel) {
-    const msg = `🍰 *Nuevo encargo — ${appNombre}*\n\n👤 *Cliente:* ${nombre}\n📱 *Teléfono:* ${telefono}\n🛍️ *Producto:* ${prod.nombre} × ${cantidad}\n💰 *Total:* ${formatPrecio(prod.precio * cantidad)}${direccion ? '\n📍 *Dirección:* ' + direccion : ''}`;
+    const totalTxt = precio ? formatPrecio(precio * cantidad) : 'a coordinar';
+    const msg = `🍰 *Nuevo encargo — ${appNombre}*\n\n👤 *Cliente:* ${nombre}\n📱 *Teléfono:* ${telefono}\n🛍️ *Pedido:* ${item.producto} × ${cantidad}\n💰 *Total:* ${totalTxt}${direccion ? '\n📍 *Dirección:* ' + direccion : ''}`;
     window.open(`https://wa.me/${adminTel.replace(/\D/g,'')}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
@@ -304,8 +320,8 @@ async function guardarPedidoEnNube(pedido) {
   if (!_tiendaCodigo) return;
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(_tiendaCodigo)}&select=datos&limit=1`,
-      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(_tiendaCodigo)}&select=datos&limit=1&_ts=${Date.now()}`,
+      { cache: 'no-store', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Cache-Control': 'no-cache' } }
     );
     let datos = {};
     if (res.ok) { const rows = await res.json(); if (rows && rows.length && rows[0].datos) datos = rows[0].datos; }
