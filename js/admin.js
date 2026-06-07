@@ -565,7 +565,11 @@ function seleccionarTema(tema) {
    COMPARTIR
 ══════════════════════════════════════════ */
 function getLinkTienda() {
-  return window.location.href.replace('admin.html', 'index.html');
+  const base = window.location.href.replace('admin.html', 'index.html').split('?')[0].split('#')[0];
+  let codigo = '';
+  try { codigo = (obtenerLicencia() || {}).codigo || ''; } catch (e) {}
+  // El link de la tienda lleva el código del inquilino para que cargue SUS productos desde la nube
+  return codigo ? (base + '?tienda=' + encodeURIComponent(codigo)) : base;
 }
 
 function cargarLinkTienda() {
