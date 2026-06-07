@@ -3,6 +3,7 @@
 /* En modo tienda pública (?tienda=CODIGO) los datos salen de la nube,
    no del localStorage de quien mira. Así el cliente ve la tienda del inquilino. */
 let _tiendaData = null;
+let _tiendaCodigo = null;
 
 function _dGet(key, def) {
   if (_tiendaData) {
@@ -22,6 +23,7 @@ function _dPromos() {
 }
 
 async function cargarTiendaPublica(codigo) {
+  _tiendaCodigo = codigo;
   try {
     const res = await fetch(
       `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1`,
@@ -135,6 +137,7 @@ function cargarPromociones() {
   if (promos.length > 0) {
     cont.innerHTML = promos.map(pr => `
       <div class="promo-card">
+        ${pr.imagen ? `<img src="${pr.imagen}" alt="" style="width:100%;height:80px;object-fit:cover;border-radius:10px;margin-bottom:8px;">` : ''}
         ${pr.badge ? `<span class="promo-badge">${pr.badge}</span>` : ''}
         <div class="promo-titulo">${pr.titulo}</div>
         ${pr.descripcion ? `<p style="font-size:0.83rem;color:var(--text2);">${pr.descripcion}</p>` : ''}
@@ -278,6 +281,9 @@ function enviarPedido() {
     const pedidos = getPedidos();
     pedidos.push(pedido);
     setPedidos(pedidos);
+  } else {
+    // Cliente en la tienda pública: el encargo va a la nube del inquilino (lo verá en Pedidos)
+    guardarPedidoEnNube(pedido);
   }
 
   document.getElementById('modalPedido').classList.remove('activo');
@@ -291,6 +297,31 @@ function enviarPedido() {
   }
 
   mostrarToast(`✅ ¡Encargo enviado! Te contactaremos pronto, ${nombre.split(' ')[0]} 🎉`);
+}
+
+/* Guarda el encargo del cliente en la nube del inquilino (lee, agrega y reescribe) */
+async function guardarPedidoEnNube(pedido) {
+  if (!_tiendaCodigo) return;
+  try {
+    const res = await fetch(
+      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(_tiendaCodigo)}&select=datos&limit=1`,
+      { headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY } }
+    );
+    let datos = {};
+    if (res.ok) { const rows = await res.json(); if (rows && rows.length && rows[0].datos) datos = rows[0].datos; }
+    let pedidos = [];
+    try { pedidos = JSON.parse(datos.pedidos || '[]'); } catch (e) { pedidos = []; }
+    pedidos.push(pedido);
+    datos.pedidos = JSON.stringify(pedidos);
+    await fetch(`${SB_URL}/rest/v1/dulzura_backups?on_conflict=tenant_id`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({ tenant_id: _tiendaCodigo, datos, updated_at: new Date().toISOString() })
+    });
+  } catch (e) { console.warn('guardar pedido nube:', e); }
 }
 
 function mostrarError(el, msg) {
