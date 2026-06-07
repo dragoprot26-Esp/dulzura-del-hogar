@@ -90,13 +90,12 @@ async function dulzuraNubeCargar() {
             _origSetItem(k, datos[k]); // escribir sin disparar push
           }
         });
-        return { hydrated: true, changed };
+        return { hydrated: true, changed, nuevo: false };
       }
     }
-    // Inquilino nuevo sin datos en la nube: subimos lo local como base inicial
+    // Inquilino nuevo: todavía no tiene datos en la nube (lo resuelve quien activa)
     _dulzuraPush = true;
-    await dulzuraNubeGuardar();
-    return { hydrated: true, changed: false };
+    return { hydrated: true, changed: false, nuevo: true };
   } catch (e) {
     console.warn('[Dulzura] No se pudo bajar de la nube:', e);
     return { hydrated: false, changed: false };

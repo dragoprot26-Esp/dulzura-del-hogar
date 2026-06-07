@@ -235,11 +235,12 @@ async function activarLicenciaPublica() {
   mostrar('\ud83d\udd04 Validando código...', true);
   const ok = await activarLicencia(codigo);
   if (ok) {
+    sessionStorage.removeItem('admin_logged'); // cerrar sesión: que entre con sus credenciales
     let usuario = '';
     try { usuario = (obtenerLicencia() || {}).usuario || ''; } catch (e) {}
     const cred = usuario
-      ? '\u2705 ¡Licencia activada! Entrá en \ud83d\udd10 Admin con el usuario \u00ab' + usuario + '\u00bb y la contraseña que te dimos con la licencia. (También funciona admin / 1234.)'
-      : '\u2705 ¡Licencia activada! Entrá en \ud83d\udd10 Admin con las credenciales de tu licencia. (También funciona admin / 1234.)';
+      ? '\u2705 ¡Licencia activada! Ahora entrá en \ud83d\udd10 Admin con tu usuario \u00ab' + usuario + '\u00bb y tu contraseña para cargar tus productos.'
+      : '\u2705 ¡Licencia activada! Ahora entrá en \ud83d\udd10 Admin con las credenciales de tu licencia.';
     mostrar(cred, true);
   } else {
     mostrar('\u274c Código inválido o no encontrado.', false);

@@ -21,7 +21,31 @@ document.addEventListener('DOMContentLoaded', () => {
   actualizarLicenciaUI();
   mostrarInfoLicencia();
   cargarLinkTienda();
+  mostrarBienvenida();
 });
+
+/* ─── Bienvenida al nuevo inquilino ─── */
+function mostrarBienvenida() {
+  const cliente = sessionStorage.getItem('dulzura_bienvenida');
+  if (!cliente) return;
+  sessionStorage.removeItem('dulzura_bienvenida');
+  const negocio = localStorage.getItem('app_nombre') || 'tu tienda';
+  const nombre = (cliente && cliente !== '1') ? cliente.split(' ')[0] : '';
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+  ov.innerHTML = `
+    <div style="background:#fff;max-width:420px;width:100%;border-radius:24px;padding:32px 26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <div style="font-size:3rem;margin-bottom:6px;">🎂✨</div>
+      <h2 style="margin:0 0 10px;color:#7a3b1f;font-size:1.5rem;">¡Bienvenido/a${nombre ? ', ' + nombre : ''}!</h2>
+      <p style="color:#555;font-size:0.95rem;line-height:1.5;margin:0 0 8px;">Tu tienda <strong>${negocio}</strong> ya está activa y lista. 🧁</p>
+      <p style="color:#777;font-size:0.85rem;line-height:1.5;margin:0 0 22px;">Cargá tus productos desde <strong>📦 Productos</strong>, dale tu estilo en <strong>🎨 Apariencia</strong>, y compartí tu tienda con el <strong>QR</strong> desde <strong>👤 Mi cuenta</strong>. ¡A endulzar el mundo!</p>
+      <button id="btnBienvenidaOk" style="background:#c0633b;color:#fff;border:none;padding:13px 28px;border-radius:14px;font-weight:700;font-size:0.95rem;cursor:pointer;">Empezar 🚀</button>
+    </div>`;
+  document.body.appendChild(ov);
+  const cerrar = () => ov.remove();
+  ov.addEventListener('click', e => { if (e.target === ov) cerrar(); });
+  ov.querySelector('#btnBienvenidaOk')?.addEventListener('click', cerrar);
+}
 
 /* ─── Navegación sidebar ─── */
 function irSeccion(id) {

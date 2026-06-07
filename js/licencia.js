@@ -118,10 +118,23 @@ async function activarLicencia(codigo) {
     try {
       sessionStorage.removeItem('dulzura_hidratado');
       if (typeof dulzuraNubeCargar === 'function') {
-        await dulzuraNubeCargar();
+        const r = await dulzuraNubeCargar();
+        if (r && r.nuevo) {
+          // Inquilino NUEVO: la tienda arranca en cero, con el nombre del negocio del panel
+          localStorage.setItem('productos', '[]');
+          localStorage.setItem('pedidos', '[]');
+          localStorage.setItem('promos', '[]');
+          localStorage.setItem('app_logo', '');
+          localStorage.setItem('app_emoji', '🍰');
+          if (remote.nombre_negocio) localStorage.setItem('app_nombre', remote.nombre_negocio);
+          if (remote.correo_cliente) localStorage.setItem('admin_email', remote.correo_cliente);
+          if (typeof dulzuraNubeGuardar === 'function') await dulzuraNubeGuardar();
+        }
         sessionStorage.setItem('dulzura_hidratado', '1');
         dulzuraHabilitarSync();
       }
+      // Bienvenida para mostrar al entrar al admin con las nuevas credenciales
+      sessionStorage.setItem('dulzura_bienvenida', remote.cliente_nombre || remote.nombre_negocio || '1');
     } catch (e) { console.warn('hidratación nube:', e); }
 
     return true;
