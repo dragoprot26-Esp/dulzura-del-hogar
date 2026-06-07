@@ -31,8 +31,8 @@ async function cargarTiendaPublica(codigo) {
     if (res.ok) rows = await res.json();
     _tiendaData = (rows && rows.length && rows[0].datos) ? rows[0].datos : {};
   } catch (e) { console.warn('tienda pública:', e); _tiendaData = {}; }
-  // En modo público ocultamos los botones del dueño (Admin / Licencia)
-  ['btnLoginAdmin', 'btnLicencia'].forEach(id => {
+  // En modo público ocultamos el botón del dueño (Admin)
+  ['btnLoginAdmin'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
   });
 }
@@ -168,8 +168,11 @@ function setupEventosPublicos() {
   document.getElementById('btnLoginAdmin')?.addEventListener('click', () =>
     document.getElementById('modalLogin').classList.add('activo'));
 
-  document.getElementById('btnLicencia')?.addEventListener('click', () =>
-    document.getElementById('modalLicencia').classList.add('activo'));
+  // Enlace "Primera vez" dentro del login: abre la activación de licencia
+  document.getElementById('linkActivarLic')?.addEventListener('click', () => {
+    document.getElementById('modalLogin')?.classList.remove('activo');
+    document.getElementById('modalLicencia')?.classList.add('activo');
+  });
   document.getElementById('activarLicenciaBtn')?.addEventListener('click', activarLicenciaPublica);
   document.getElementById('inputCodigoPub')?.addEventListener('keydown', e => { if (e.key === 'Enter') activarLicenciaPublica(); });
 
@@ -212,7 +215,6 @@ function intentarLogin() {
   const errEl = document.getElementById('loginError');
   if (!user || !pass) { mostrarError(errEl, 'Completá usuario y contraseña.'); return; }
   if (loginAdmin(user, pass)) {
-    if (!obtenerLicencia()) { crearLicenciaTemporal(); alert('🎉 ¡Período de prueba de 15 días activado!'); }
     document.getElementById('modalLogin').classList.remove('activo');
     window.location.href = 'admin.html';
   } else {
@@ -239,9 +241,15 @@ async function activarLicenciaPublica() {
     let usuario = '';
     try { usuario = (obtenerLicencia() || {}).usuario || ''; } catch (e) {}
     const cred = usuario
-      ? '\u2705 ¡Licencia activada! Ahora entrá en \ud83d\udd10 Admin con tu usuario \u00ab' + usuario + '\u00bb y tu contraseña para cargar tus productos.'
-      : '\u2705 ¡Licencia activada! Ahora entrá en \ud83d\udd10 Admin con las credenciales de tu licencia.';
+      ? '\u2705 ¡Licencia activada! Te llevamos al ingreso. Entrá con tu usuario \u00ab' + usuario + '\u00bb y tu contraseña.'
+      : '\u2705 ¡Licencia activada! Entrá en \ud83d\udd10 Admin con las credenciales de tu licencia.';
     mostrar(cred, true);
+    setTimeout(() => {
+      document.getElementById('modalLicencia')?.classList.remove('activo');
+      const lu = document.getElementById('loginUser'); if (lu && usuario) lu.value = usuario;
+      document.getElementById('modalLogin')?.classList.add('activo');
+      document.getElementById('loginPass')?.focus();
+    }, 2200);
   } else {
     mostrar('\u274c Código inválido o no encontrado.', false);
   }
