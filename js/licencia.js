@@ -110,6 +110,10 @@ async function activarLicencia(codigo) {
     };
     guardarLicencia(lic);
 
+    // Las credenciales que generó el panel pasan a ser el login del admin (como SalonPro)
+    if (remote.usuario_admin) localStorage.setItem('admin_user', remote.usuario_admin);
+    if (remote.pass_admin)    localStorage.setItem('admin_pass', btoa(remote.pass_admin));
+
     // Multi-inquilino: traer los datos de ESTE inquilino desde la nube
     try {
       sessionStorage.removeItem('dulzura_hidratado');
