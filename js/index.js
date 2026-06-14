@@ -1,12 +1,27 @@
 /* ===== index.js — Dulzura del Hogar (página pública) ===== */
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await cargarPublicoSiCorresponde();
   aplicarApariencia();
   cargarProductos();
   cargarPromociones();
   cargarFooter();
   setupEventosPublicos();
 });
+
+// Si la URL trae ?codigo=DULZ-..., mostramos esa tienda leyendo de la nube.
+async function cargarPublicoSiCorresponde() {
+  const params = new URLSearchParams(location.search);
+  const codigo = (params.get('codigo') || '').trim().toUpperCase();
+  if (!codigo) return;
+  try {
+    const data = await nubePublica(codigo);
+    if (data && data.activa) {
+      if (data.datos) aplicarSnapshot(data.datos);
+      if (data.nombre_negocio) localStorage.setItem('app_nombre', data.nombre_negocio);
+    }
+  } catch (e) { console.warn('público:', e); }
+}
 
 /* ── Apariencia (logo + nombre guardado por el admin) ── */
 function aplicarApariencia() {
