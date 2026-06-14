@@ -297,11 +297,11 @@ function recuperarAdmin(_email) {
    DATOS (por ahora locales; la nube se conecta en el próximo paso)
 ═════════════════════════════════════════════ */
 function getProductos() { return JSON.parse(localStorage.getItem('productos') || '[]'); }
-function setProductos(arr) { localStorage.setItem('productos', JSON.stringify(arr)); }
+function setProductos(arr) { localStorage.setItem('productos', JSON.stringify(arr)); colaPush(); }
 function getPedidos()   { return JSON.parse(localStorage.getItem('pedidos') || '[]'); }
-function setPedidos(arr)   { localStorage.setItem('pedidos', JSON.stringify(arr)); }
+function setPedidos(arr)   { localStorage.setItem('pedidos', JSON.stringify(arr)); colaPush(); }
 function getPromos()    { return JSON.parse(localStorage.getItem('promos') || '[]'); }
-function setPromos(arr)    { localStorage.setItem('promos', JSON.stringify(arr)); }
+function setPromos(arr)    { localStorage.setItem('promos', JSON.stringify(arr)); colaPush(); }
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -310,6 +310,113 @@ function formatPrecio(n) { return '$' + Number(n).toLocaleString('es-AR'); }
 function formatFecha(ts) {
   const d = new Date(ts);
   return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ═════════════════════════════════════════════
+   SINCRONIZACIÓN CON LA NUBE (dulzura_backups)
+   - Al entrar al panel: traer (pull) lo último de la nube.
+   - Al cambiar datos: subir (push) en segundo plano.
+   - Página pública: leer por código con dulzura_publica (sin login).
+═════════════════════════════════════════════ */
+let _pushPendiente     = false;
+let _aplicandoSnapshot = false;
+let _pushTimer = null;
+
+function snapshotLocal() {
+  return {
+    productos: getProductos(),
+    promos:    getPromos(),
+    pedidos:   getPedidos(),
+    app_nombre:     localStorage.getItem('app_nombre') || '',
+    app_emoji:      localStorage.getItem('app_emoji') || '',
+    app_logo:       localStorage.getItem('app_logo') || '',
+    admin_nombre:   localStorage.getItem('admin_nombre') || '',
+    admin_email:    localStorage.getItem('admin_email') || '',
+    admin_telefono: localStorage.getItem('admin_telefono') || '',
+    tema:           localStorage.getItem('tema') || 'claro'
+  };
+}
+
+function aplicarSnapshot(d) {
+  if (!d || typeof d !== 'object') return;
+  _aplicandoSnapshot = true;
+  if (Array.isArray(d.productos)) setProductos(d.productos);
+  if (Array.isArray(d.promos))    setPromos(d.promos);
+  if (Array.isArray(d.pedidos))   setPedidos(d.pedidos);
+  ['app_nombre','app_emoji','app_logo','admin_nombre','admin_email','admin_telefono','tema'].forEach(k => {
+    if (d[k] !== undefined && d[k] !== null && d[k] !== '') localStorage.setItem(k, d[k]);
+  });
+  _aplicandoSnapshot = false;
+}
+
+// Encola un push con un pequeño retardo (junta varios cambios seguidos).
+function colaPush() {
+  if (_aplicandoSnapshot) return;   // no re-subir lo que acabamos de bajar
+  if (!sbObtenerSesion()) return;   // solo el dueño/colaborador logueado sube
+  clearTimeout(_pushTimer);
+  _pushTimer = setTimeout(() => { nubeGuardar(); }, 800);
+}
+
+// Trae los datos del inquilino desde la nube y los aplica al localStorage.
+async function nubeTraer() {
+  const lic = obtenerLicencia();
+  if (!lic || !lic.codigo) return false;
+  const token = await sbToken();
+  if (!token) return false;
+  const url = `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(lic.codigo)}&select=datos`;
+  async function pedir(bearer) {
+    return fetch(url, { headers: { apikey: SB_ANON, Authorization: 'Bearer ' + bearer } });
+  }
+  try {
+    let res = await pedir(token);
+    if (res.status === 401 || res.status === 403) {
+      const s = await sbRefrescar(); if (s) res = await pedir(s.access_token);
+    }
+    if (!res.ok) return false;
+    const filas = await res.json();
+    if (Array.isArray(filas) && filas.length && filas[0].datos) {
+      aplicarSnapshot(filas[0].datos);
+      return true;
+    }
+    return false;
+  } catch (e) { console.warn('nubeTraer:', e); return false; }
+}
+
+// Sube (upsert) los datos actuales del inquilino a la nube.
+async function nubeGuardar() {
+  const lic = obtenerLicencia();
+  if (!lic || !lic.codigo) return false;
+  const token = await sbToken();
+  if (!token) return false;
+  _pushPendiente = true;
+  const cuerpo = JSON.stringify({ tenant_id: lic.codigo, datos: snapshotLocal(), updated_at: new Date().toISOString() });
+  async function pedir(bearer) {
+    return fetch(`${SB_URL}/rest/v1/dulzura_backups`, {
+      method: 'POST',
+      headers: {
+        apikey: SB_ANON,
+        Authorization: 'Bearer ' + bearer,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates'
+      },
+      body: cuerpo
+    });
+  }
+  try {
+    let res = await pedir(token);
+    if (res.status === 401 || res.status === 403) {
+      const s = await sbRefrescar(); if (s) res = await pedir(s.access_token);
+    }
+    _pushPendiente = false;
+    if (!res.ok) { console.warn('nubeGuardar falló:', res.status, await res.text()); return false; }
+    return true;
+  } catch (e) { _pushPendiente = false; console.warn('nubeGuardar:', e); return false; }
+}
+
+// Lectura PÚBLICA por código (página pública, sin login).
+async function nubePublica(codigo) {
+  const r = await sbRPC('dulzura_publica', { p_codigo: (codigo || '').trim().toUpperCase() }, { conAuth: false });
+  return r.ok ? r.data : null;
 }
 
 // Borra TODAS las claves del inquilino (para arrancar limpio uno nuevo).
