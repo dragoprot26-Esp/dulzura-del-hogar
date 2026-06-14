@@ -141,6 +141,7 @@ function cargarDatosAdmin() {
   if (document.getElementById('adminNombre'))   document.getElementById('adminNombre').value = nombre;
   if (document.getElementById('adminEmail'))    document.getElementById('adminEmail').value  = email;
   if (document.getElementById('adminTelefono')) document.getElementById('adminTelefono').value = tel;
+  if (document.getElementById('operadorNombre')) document.getElementById('operadorNombre').value = getOperador();
 
   const saludo = document.getElementById('saludoAdmin');
   if (saludo) saludo.textContent = `¡Hola, ${nombre.split(' ')[0]}! 👋`;
@@ -154,6 +155,8 @@ function guardarDatosAdmin() {
   if (n) localStorage.setItem('admin_nombre', n);
   if (e) localStorage.setItem('admin_email', e);
   if (t) localStorage.setItem('admin_telefono', t);
+  const op = document.getElementById('operadorNombre')?.value;
+  if (op && op.trim()) setOperador(op);
   colaPush();
   const saludo = document.getElementById('saludoAdmin');
   if (saludo) saludo.textContent = `¡Hola, ${(n||'').split(' ')[0]}! 👋`;
@@ -549,7 +552,7 @@ function renderPedido(p) {
 
 function completarPedido(id) {
   const pedidos = getPedidos().map(p => p.id === id
-    ? { ...p, estado: 'completado', atendidoPor: nombreActual(), rolUsuario: rolActual(), fechaEntrega: Date.now() }
+    ? { ...p, estado: 'completado', atendidoPor: getOperador(), fechaEntrega: Date.now() }
     : p);
   setPedidos(pedidos);
   cargarPedidosAdmin();
@@ -606,7 +609,7 @@ function cargarEntregas() {
       <td style="font-size:0.83rem;">${detallePedido(p)}</td>
       <td style="white-space:nowrap;">${formatPrecio(p.total || 0)}</td>
       <td><span class="estado-badge estado-${p.estado}">${p.estado}</span></td>
-      <td>${p.atendidoPor ? `${p.atendidoPor} <span class="text-muted" style="font-size:0.78rem;">(${p.rolUsuario || ''})</span>` : '—'}</td>
+      <td>${p.atendidoPor || '—'}</td>
     </tr>`).join('');
 }
 

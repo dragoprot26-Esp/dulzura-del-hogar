@@ -88,6 +88,9 @@ async function activarLicencia(codigo) {
     dias,
     expira
   };
+  // Máximo de equipos/personal por tienda (default 2; configurable desde la licencia)
+  localStorage.setItem('max_personal', String(remoto.max_personal || 2));
+
   guardarLicencia(lic);
   return lic;
 }

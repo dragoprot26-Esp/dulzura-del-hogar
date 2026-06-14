@@ -253,6 +253,14 @@ async function loginDueno(codigo, usuario, pass) {
   guardada.email = emailDueno(usuario, codigo);
   guardada.rol = 'dueno';
   guardarLicencia(guardada);
+
+  // 4) Registrar este equipo (aplica el límite de accesos por tienda)
+  const reg = await registrarDispositivo();
+  if (!reg.ok) {
+    sessionStorage.removeItem('admin_logged');
+    await sbSignOut();
+    return reg;
+  }
   return { ok: true };
 }
 
@@ -379,7 +387,9 @@ function snapshotLocal() {
     admin_nombre:   localStorage.getItem('admin_nombre') || '',
     admin_email:    localStorage.getItem('admin_email') || '',
     admin_telefono: localStorage.getItem('admin_telefono') || '',
-    tema:           localStorage.getItem('tema') || 'claro'
+    tema:           localStorage.getItem('tema') || 'claro',
+    dispositivos:   getDispositivos(),
+    max_personal:   maxPersonal()
   };
 }
 
@@ -392,6 +402,8 @@ function aplicarSnapshot(d) {
   ['app_nombre','app_emoji','app_logo','admin_nombre','admin_email','admin_telefono','tema'].forEach(k => {
     if (d[k] !== undefined && d[k] !== null && d[k] !== '') localStorage.setItem(k, d[k]);
   });
+  if (d.dispositivos && typeof d.dispositivos === 'object') setDispositivos(d.dispositivos);
+  if (d.max_personal) localStorage.setItem('max_personal', String(d.max_personal));
   _aplicandoSnapshot = false;
 }
 
@@ -463,6 +475,52 @@ async function nubeGuardar() {
 async function nubePublica(codigo) {
   const r = await sbRPC('dulzura_publica', { p_codigo: (codigo || '').trim().toUpperCase() }, { conAuth: false });
   return r.ok ? r.data : null;
+}
+
+/* ═════════════════════════════════════════════
+   MULTI-DISPOSITIVO (varios equipos para una misma tienda)
+═════════════════════════════════════════════ */
+function deviceId() {
+  let id = localStorage.getItem('device_id');
+  if (!id) { id = 'd_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); localStorage.setItem('device_id', id); }
+  return id;
+}
+function getOperador() { return localStorage.getItem('operador_nombre') || (obtenerLicencia() || {}).usuario || 'Operador'; }
+function setOperador(n) { if (n && n.trim()) localStorage.setItem('operador_nombre', n.trim()); }
+function maxPersonal() { return parseInt(localStorage.getItem('max_personal') || '2', 10) || 2; }
+function getDispositivos() { try { return JSON.parse(localStorage.getItem('dispositivos') || '{}'); } catch (e) { return {}; } }
+function setDispositivos(d) { localStorage.setItem('dispositivos', JSON.stringify(d || {})); }
+
+// Registra este equipo en la tienda y aplica el límite de accesos.
+// Devuelve { ok } o { ok:false, error } si se superó el máximo.
+// Ante cualquier error de red NO bloquea (deja entrar), para no trabar al dueño.
+async function registrarDispositivo() {
+  try {
+    await nubeTraer();                 // trae la lista actual de equipos
+    const disp = getDispositivos();
+    const id = deviceId();
+    if (disp[id]) {                    // este equipo ya estaba habilitado
+      if (!localStorage.getItem('operador_nombre') && disp[id].nombre) setOperador(disp[id].nombre);
+      return { ok: true };
+    }
+    const max = maxPersonal();
+    if (Object.keys(disp).length >= max) {
+      return { ok: false, error: `Esta tienda ya tiene ${max} accesos habilitados.\nPara sumar más personal, escribí a ${PROVEEDOR_MAIL}` };
+    }
+    let nombre = localStorage.getItem('operador_nombre');
+    if (!nombre && typeof prompt === 'function') {
+      nombre = prompt('¿Cómo te llamás? (para registrar quién atiende los pedidos)') || '';
+    }
+    nombre = (nombre || '').trim() || 'Operador';
+    setOperador(nombre);
+    disp[id] = { nombre, ts: Date.now() };
+    setDispositivos(disp);
+    await nubeGuardar();               // sube la lista actualizada
+    return { ok: true };
+  } catch (e) {
+    console.warn('registrarDispositivo:', e);
+    return { ok: true };               // fail-open
+  }
 }
 
 // Borra TODAS las claves del inquilino (para arrancar limpio uno nuevo).
