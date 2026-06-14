@@ -3,7 +3,8 @@
 // ─── Guard de sesión ───
 (function() {
   if (!isAdminLogged()) { window.location.href = 'index.html'; return; }
-  if (!verificarLicencia()) { alert('Tu licencia venció o no está activa. Activala desde la pantalla de inicio.'); logoutAdmin(); }
+  if (!obtenerLicencia()) { window.location.href = 'index.html'; return; }
+  if (!verificarLicencia()) { alert('❌ Tu licencia ha vencido. Contactá al proveedor.'); logoutAdmin(); }
 })();
 
 /* ─── DOMContentLoaded ─── */
@@ -19,62 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   actualizarLicenciaUI();
   mostrarInfoLicencia();
   cargarLinkTienda();
-  mostrarBienvenida();
-  // Avisos de encargos en vivo: revisa la nube cada 30 s
-  setTimeout(refrescarPedidosNube, 3000);
-  setInterval(refrescarPedidosNube, 30000);
 });
-
-/* ─── Encargos nuevos desde la nube (campanita en vivo) ─── */
-async function refrescarPedidosNube() {
-  let codigo = '';
-  try { codigo = (obtenerLicencia() || {}).codigo || ''; } catch (e) {}
-  if (!codigo || codigo === 'TRIAL-15') return;
-  try {
-    const res = await fetch(
-      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1&_ts=${Date.now()}`,
-      { cache: 'no-store', headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY, 'Cache-Control': 'no-cache' } }
-    );
-    if (!res.ok) return;
-    const rows = await res.json();
-    if (!rows || !rows.length || !rows[0].datos) return;
-    let nube = [];
-    try { nube = JSON.parse(rows[0].datos.pedidos || '[]'); } catch (e) { return; }
-    const locales = getPedidos();
-    const map = {};
-    locales.forEach(p => { map[p.id] = p; });   // lo local manda para los que ya existen
-    let nuevos = 0;
-    nube.forEach(p => { if (!map[p.id]) { map[p.id] = p; nuevos++; } });
-    if (nuevos > 0) {
-      setPedidos(Object.values(map));
-      cargarPedidosAdmin();
-      try { toast(nuevos === 1 ? '🔔 ¡Nuevo encargo recibido!' : `🔔 ${nuevos} encargos nuevos`); } catch (e) {}
-    }
-  } catch (e) { /* silencio: reintenta en el próximo ciclo */ }
-}
-
-/* ─── Bienvenida al nuevo inquilino ─── */
-function mostrarBienvenida() {
-  const cliente = sessionStorage.getItem('dulzura_bienvenida');
-  if (!cliente) return;
-  sessionStorage.removeItem('dulzura_bienvenida');
-  const negocio = localStorage.getItem('app_nombre') || 'tu tienda';
-  const nombre = (cliente && cliente !== '1') ? cliente.split(' ')[0] : '';
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
-  ov.innerHTML = `
-    <div style="background:#fff;max-width:420px;width:100%;border-radius:24px;padding:32px 26px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
-      <div style="font-size:3rem;margin-bottom:6px;">🎂✨</div>
-      <h2 style="margin:0 0 10px;color:#7a3b1f;font-size:1.5rem;">¡Bienvenido/a${nombre ? ', ' + nombre : ''}!</h2>
-      <p style="color:#555;font-size:0.95rem;line-height:1.5;margin:0 0 8px;">Tu tienda <strong>${negocio}</strong> ya está activa y lista. 🧁</p>
-      <p style="color:#777;font-size:0.85rem;line-height:1.5;margin:0 0 22px;">Cargá tus productos desde <strong>📦 Productos</strong>, dale tu estilo en <strong>🎨 Apariencia</strong>, y compartí tu tienda con el <strong>QR</strong> desde <strong>👤 Mi cuenta</strong>. ¡A endulzar el mundo!</p>
-      <button id="btnBienvenidaOk" style="background:#c0633b;color:#fff;border:none;padding:13px 28px;border-radius:14px;font-weight:700;font-size:0.95rem;cursor:pointer;">Empezar 🚀</button>
-    </div>`;
-  document.body.appendChild(ov);
-  const cerrar = () => ov.remove();
-  ov.addEventListener('click', e => { if (e.target === ov) cerrar(); });
-  ov.querySelector('#btnBienvenidaOk')?.addEventListener('click', cerrar);
-}
 
 /* ─── Navegación sidebar ─── */
 function irSeccion(id) {
@@ -267,6 +213,11 @@ function cargarProductosAdmin() {
 }
 
 function abrirModalProducto() {
+  // Tope de 40 imágenes (productos + promos)
+  if (!editandoProductoId && totalImagenesInquilino() >= 40) {
+    toast('⚠️ Llegaste al tope de 40 imágenes (productos + promos). Quitá alguna para agregar otra.');
+    return;
+  }
   editandoProductoId  = null;
   imagenProductoActual = '';
   document.getElementById('modalProdTitulo').textContent = '➕ Agregar producto';
@@ -398,6 +349,13 @@ function agregarCampoExtra(key = '', val = '') {
   cont.appendChild(row);
 }
 
+// Cuenta cuántas imágenes hay cargadas (productos + promos) para el tope de 40.
+function totalImagenesInquilino() {
+  const prods  = getProductos().filter(p => p.imagen).length;
+  const promos = getPromos().filter(p => p.imagen).length;
+  return prods + promos;
+}
+
 /* ══════════════════════════════════════════
    PROMOCIONES (con imagen y precio)
 ══════════════════════════════════════════ */
@@ -436,6 +394,11 @@ function cargarPromosAdmin() {
 }
 
 function abrirModalPromo() {
+  // Tope de 40 imágenes (productos + promos)
+  if (!editandoPromoId && totalImagenesInquilino() >= 40) {
+    toast('⚠️ Llegaste al tope de 40 imágenes (productos + promos). Quitá alguna para agregar otra.');
+    return;
+  }
   editandoPromoId = null;
   imagenPromoActual = '';
   document.getElementById('modalPromoTitulo').textContent = '➕ Agregar promoción';
@@ -618,11 +581,7 @@ function seleccionarTema(tema) {
    COMPARTIR
 ══════════════════════════════════════════ */
 function getLinkTienda() {
-  const base = window.location.href.replace('admin.html', 'index.html').split('?')[0].split('#')[0];
-  let codigo = '';
-  try { codigo = (obtenerLicencia() || {}).codigo || ''; } catch (e) {}
-  // El link de la tienda lleva el código del inquilino para que cargue SUS productos desde la nube
-  return codigo ? (base + '?tienda=' + encodeURIComponent(codigo)) : base;
+  return window.location.href.replace('admin.html', 'index.html');
 }
 
 function cargarLinkTienda() {
@@ -707,7 +666,7 @@ function actualizarLicenciaUI() {
   const d = lic.expira ? Math.ceil((lic.expira - Date.now()) / 86400000) : 999;
   if (d <= 4) {
     cont.className = 'licencia-estado licencia-warning';
-    cont.innerHTML = `⏳ Licencia de prueba — ${d} día${d!==1?'s':''} restante${d!==1?'s':''}`;
+    cont.innerHTML = `⏳ Licencia ${lic.temporal ? 'de prueba' : ''} — ${d} día${d!==1?'s':''} restante${d!==1?'s':''}`;
   } else {
     cont.className = 'licencia-estado licencia-ok';
     cont.innerHTML = `✅ Licencia <strong>${lic.plan || 'premium'}</strong> activa — ${d} días restantes`;
@@ -718,25 +677,30 @@ async function activarCodigoLicencia() {
   const codigo = document.getElementById('inputCodigo')?.value.trim();
   if (!codigo) { toast('⚠️ Ingresá un código'); return; }
   toast('🔄 Validando código...');
-  const ok = await activarLicencia(codigo);
-  if (ok) { toast('✅ ¡Licencia activada!'); actualizarLicenciaUI(); mostrarInfoLicencia(); }
+  const lic = await activarLicencia(codigo);
+  if (lic) { toast('✅ ¡Licencia activada!'); actualizarLicenciaUI(); mostrarInfoLicencia(); }
   else toast('❌ Código inválido o no encontrado');
 }
 
 /* ══════════════════════════════════════════
    CAMBIAR CONTRASEÑA
 ══════════════════════════════════════════ */
-function cambiarContrasena() {
-  const actual  = document.getElementById('passActual')?.value;
-  const nueva   = document.getElementById('passNueva')?.value;
-  const rep     = document.getElementById('passRepetir')?.value;
-  const guardada = atob(localStorage.getItem('admin_pass') || btoa('1234'));
-  if (actual !== guardada) { toast('⚠️ Contraseña actual incorrecta'); return; }
-  if (!nueva || nueva.length < 4) { toast('⚠️ Mínimo 4 caracteres'); return; }
+async function cambiarContrasena() {
+  const actual = document.getElementById('passActual')?.value;
+  const nueva  = document.getElementById('passNueva')?.value;
+  const rep    = document.getElementById('passRepetir')?.value;
+  if (!actual) { toast('⚠️ Ingresá tu contraseña actual'); return; }
+  if (!nueva || nueva.length < 6) { toast('⚠️ La nueva debe tener 6 caracteres o más'); return; }
   if (nueva !== rep) { toast('⚠️ Las contraseñas no coinciden'); return; }
-  localStorage.setItem('admin_pass', btoa(nueva));
-  ['passActual','passNueva','passRepetir'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
-  toast('✅ Contraseña cambiada');
+
+  toast('🔄 Cambiando contraseña...');
+  const res = await cambiarPasswordAuth(actual, nueva);
+  if (res.ok) {
+    ['passActual','passNueva','passRepetir'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    toast('✅ Contraseña cambiada');
+  } else {
+    toast('⚠️ ' + (res.error || 'No se pudo cambiar la contraseña'));
+  }
 }
 
 /* ══════════════════════════════════════════
@@ -826,13 +790,6 @@ function configurarEventosAdmin() {
   // Sidebar
   document.querySelectorAll('.sidebar-menu [data-sec]').forEach(link => {
     link.addEventListener('click', e => { e.preventDefault(); irSeccion(link.dataset.sec); });
-  });
-
-  // Vista de página: abre la tienda tal como la ve el cliente
-  document.getElementById('navVistaPagina')?.addEventListener('click', e => {
-    e.preventDefault();
-    const url = getLinkTienda();
-    window.open(url, '_blank');
   });
 
   // Temas

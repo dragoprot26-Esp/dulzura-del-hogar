@@ -1,257 +1,340 @@
-/* ===== comun.js — Dulzura del Hogar ===== */
+/* ===== comun.js — Dulzura del Hogar =====
+   Núcleo compartido: Supabase, login real (Auth), helpers y datos.
+   Carga PRIMERO (antes de licencia.js / index.js / admin.js).
+*/
 
-const EMAILJS_SERVICE_ID  = 'TU_SERVICE_ID';    // ← reemplazar
-const EMAILJS_TEMPLATE_ID = 'TU_TEMPLATE_ID';   // ← reemplazar
-const EMAILJS_PUBLIC_KEY  = 'TU_PUBLIC_KEY';     // ← reemplazar
+/* ─────────────────────────────────────────────
+   SUPABASE (base compartida del molde)
+───────────────────────────────────────────── */
+const SB_URL  = 'https://pcxlhgdpxfuybzfsquem.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeGxoZ2RweGZ1eWJ6ZnNxdWVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDIyOTQsImV4cCI6MjA5NjE3ODI5NH0.HJWpFO8TkRsmUx15GtSsUusjvVEhUsi5b_QGoPoPU00';
 
-/* =====================================================================
-   SUPABASE (CyC Admin v2 — base nueva)
-   Config compartida: la usa también licencia.js
-   ===================================================================== */
-const SB_URL = 'https://pcxlhgdpxfuybzfsquem.supabase.co';
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjeGxoZ2RweGZ1eWJ6ZnNxdWVtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2MDIyOTQsImV4cCI6MjA5NjE3ODI5NH0.HJWpFO8TkRsmUx15GtSsUusjvVEhUsi5b_QGoPoPU00';
+const APP_PREFIJO    = 'DULZ';
+const DOMINIO_DUENO  = 'tiendalibre.app';     // compartido por todas las apps (NO cambiar)
+const PROVEEDOR_MAIL = 'dragoprot26@gmail.com';
 
-/* =====================================================================
-   SYNC MULTI-INQUILINO  (igual idea que SalonPro: 1 fila por inquilino)
-   Cada licencia (codigo) tiene su propia "tienda" en la nube.
-   Tabla: dulzura_backups  (tenant_id, datos, updated_at)
-   ===================================================================== */
-const DULZURA_SYNC_KEYS = [
-  'productos', 'pedidos', 'promos',
-  'app_nombre', 'app_emoji', 'app_logo',
-  'admin_nombre', 'admin_email', 'admin_telefono',
-  'tema'
-];
+/* ─────────────────────────────────────────────
+   EmailJS (avisos) — claves del molde
+───────────────────────────────────────────── */
+const EMAILJS_SERVICE_ID  = 'service_yyq7g8j';
+const EMAILJS_PUBLIC_KEY   = 'jhKfIcmjuvOrBXfp5';
+const EMAILJS_TEMPLATE_ID  = '';   // (opcional) completar si se usa recuperación por mail
 
-let _dulzuraPush = false;          // recién se habilita después de hidratar de la nube
-let _dulzuraTimer = null;
+/* ═════════════════════════════════════════════
+   SESIÓN SUPABASE AUTH
+═════════════════════════════════════════════ */
+const SB_SESS_KEY = 'dulzura_sb_sess';
 
-// Guardamos la versión original de setItem para escribir SIN disparar sync
-const _origSetItem = localStorage.setItem.bind(localStorage);
+function sbGuardarSesion(data) {
+  const s = {
+    access_token:  data.access_token,
+    refresh_token: data.refresh_token,
+    user_id:       data.user?.id || '',
+    email:         data.user?.email || '',
+    expira:        Date.now() + ((data.expires_in || 3600) * 1000)
+  };
+  localStorage.setItem(SB_SESS_KEY, JSON.stringify(s));
+  return s;
+}
 
-// Código de licencia = tenant_id. Ignoramos el código de prueba genérico.
-function _dulzuraCodigo() {
+function sbObtenerSesion() {
   try {
-    const lic = JSON.parse(localStorage.getItem('dulzura_licencia') || 'null');
-    const c = lic && lic.codigo ? lic.codigo : null;
-    if (!c || c === 'TRIAL-15') return null;  // sin licencia real → todo local
-    return c;
+    const raw = localStorage.getItem(SB_SESS_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && s.access_token && s.refresh_token) ? s : null;
   } catch (e) { return null; }
 }
 
-function dulzuraHabilitarSync() { _dulzuraPush = true; }
-
-function _dulzuraDebounce() {
-  if (_dulzuraTimer) clearTimeout(_dulzuraTimer);
-  _dulzuraTimer = setTimeout(dulzuraNubeGuardar, 800);
+function sbLimpiarSesion() {
+  localStorage.removeItem(SB_SESS_KEY);
 }
 
-// Sube el estado actual (todos los datos del inquilino) a la nube
-async function dulzuraNubeGuardar() {
-  if (!_dulzuraPush) return;
-  const codigo = _dulzuraCodigo();
-  if (!codigo) return;
-  const datos = {};
-  DULZURA_SYNC_KEYS.forEach(k => {
-    const v = localStorage.getItem(k);
-    if (v !== null) datos[k] = v;
-  });
+// Refresca el token si está por vencer (margen 60s). Devuelve la sesión o null.
+async function sbRefrescar() {
+  const s = sbObtenerSesion();
+  if (!s) return null;
+  if (Date.now() < s.expira - 60000) return s;   // todavía vigente
   try {
-    await fetch(`${SB_URL}/rest/v1/dulzura_backups`, {
+    const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SB_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: s.refresh_token })
+    });
+    const data = await res.json();
+    if (!res.ok) { sbLimpiarSesion(); return null; }
+    return sbGuardarSesion(data);
+  } catch (e) {
+    return s; // si falla por red, devolvemos la actual
+  }
+}
+
+// Devuelve un access_token válido (refrescando si hace falta) o null.
+async function sbToken() {
+  const s = await sbRefrescar();
+  return s ? s.access_token : null;
+}
+
+async function sbSignIn(email, password) {
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { apikey: SB_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: data.error_description || data.msg || data.error || 'Credenciales incorrectas.' };
+    }
+    sbGuardarSesion(data);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'No se pudo conectar con el servidor.' };
+  }
+}
+
+async function sbSignUp(email, password) {
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { apikey: SB_ANON, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim(), password })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: data.error_description || data.msg || data.error || 'No se pudo crear la cuenta.' };
+    }
+    if (data.access_token) sbGuardarSesion(data);
+    return { ok: true, conSesion: !!data.access_token };
+  } catch (e) {
+    return { ok: false, error: 'No se pudo conectar con el servidor.' };
+  }
+}
+
+async function sbSignOut() {
+  const s = sbObtenerSesion();
+  if (s) {
+    try {
+      await fetch(`${SB_URL}/auth/v1/logout`, {
+        method: 'POST',
+        headers: { apikey: SB_ANON, Authorization: 'Bearer ' + s.access_token }
+      });
+    } catch (e) { /* no-op */ }
+  }
+  sbLimpiarSesion();
+}
+
+/* ═════════════════════════════════════════════
+   RPC (funciones del servidor) con reintento ante 401/403
+═════════════════════════════════════════════ */
+async function sbRPC(fn, params = {}, { conAuth = true } = {}) {
+  async function pedir(bearer) {
+    return fetch(`${SB_URL}/rest/v1/rpc/${fn}`, {
       method: 'POST',
       headers: {
-        'apikey': SB_KEY,
-        'Authorization': 'Bearer ' + SB_KEY,
-        'Content-Type': 'application/json',
-        'Prefer': 'resolution=merge-duplicates'
+        apikey: SB_ANON,
+        Authorization: 'Bearer ' + bearer,
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ tenant_id: codigo, datos, updated_at: new Date().toISOString() })
+      body: JSON.stringify(params)
     });
-  } catch (e) { console.warn('[Dulzura] No se pudo subir a la nube:', e); }
-}
-
-// Baja los datos del inquilino desde la nube y los escribe en localStorage
-async function dulzuraNubeCargar() {
-  const codigo = _dulzuraCodigo();
-  if (!codigo) return { hydrated: false, changed: false };
+  }
   try {
-    const res = await fetch(
-      `${SB_URL}/rest/v1/dulzura_backups?tenant_id=eq.${encodeURIComponent(codigo)}&select=datos&limit=1`,
-      { headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY } }
-    );
-    if (res.ok) {
-      const rows = await res.json();
-      if (rows && rows.length && rows[0].datos) {
-        const datos = rows[0].datos;
-        let changed = false;
-        Object.keys(datos).forEach(k => {
-          if (DULZURA_SYNC_KEYS.includes(k)) {
-            if (localStorage.getItem(k) !== datos[k]) changed = true;
-            _origSetItem(k, datos[k]); // escribir sin disparar push
-          }
-        });
-        return { hydrated: true, changed, nuevo: false };
-      }
+    let bearer = conAuth ? (await sbToken()) || SB_ANON : SB_ANON;
+    let res = await pedir(bearer);
+    // Reintento: si rechazó por auth y hay sesión, refrescamos y reintentamos
+    if ((res.status === 401 || res.status === 403) && conAuth) {
+      const s = await sbRefrescar();
+      if (s) res = await pedir(s.access_token);
     }
-    // Inquilino nuevo: todavía no tiene datos en la nube (lo resuelve quien activa)
-    _dulzuraPush = true;
-    return { hydrated: true, changed: false, nuevo: true };
+    if (!res.ok) {
+      const txt = await res.text();
+      console.warn(`RPC ${fn} falló (${res.status}):`, txt);
+      return { ok: false, status: res.status, error: txt };
+    }
+    const txt = await res.text();
+    return { ok: true, data: txt ? JSON.parse(txt) : null };
   } catch (e) {
-    console.warn('[Dulzura] No se pudo bajar de la nube:', e);
-    return { hydrated: false, changed: false };
+    console.warn(`RPC ${fn} error:`, e);
+    return { ok: false, error: String(e) };
   }
 }
 
-// Interceptar TODOS los guardados (productos, promos, perfil, tema...) sin tocar admin.js
-localStorage.setItem = function (k, v) {
-  _origSetItem(k, v);
-  if (_dulzuraPush && DULZURA_SYNC_KEYS.includes(k)) _dulzuraDebounce();
-};
-
-/* ─── Datos de ejemplo ─── */
-const PRODUCTOS_INICIALES = [
-  {
-    id: 'p1',
-    nombre: 'Alfajores de Maicena',
-    precio: 1500,
-    imagen: '',
-    detalle: 'Rellenos con dulce de leche, rebozados en coco rallado. ¡Irresistibles!',
-    extras: { Ingredientes: 'Maicena, manteca, dulce de leche, coco', Unidades: '12 unidades' }
-  },
-  {
-    id: 'p2',
-    nombre: 'Mermelada Casera',
-    precio: 900,
-    imagen: '',
-    detalle: 'Mermelada de durazno artesanal, sin conservantes, elaborada con fruta de estación.',
-    extras: { Peso: '300 g', Conservación: 'Heladera hasta 2 semanas' }
-  },
-  {
-    id: 'p3',
-    nombre: 'Torta de Chocolate',
-    precio: 4200,
-    imagen: '',
-    detalle: 'Húmeda, esponjosa, con ganache de chocolate negro. Pedido con 48 hs de anticipación.',
-    extras: { Porciones: '8-10', Relleno: 'Ganache de chocolate' }
-  }
-];
-
-/* ─── inicializarDatos ─── */
-function inicializarDatos() {
-  if (!localStorage.getItem('productos'))
-    localStorage.setItem('productos', JSON.stringify(PRODUCTOS_INICIALES));
-  if (!localStorage.getItem('pedidos'))
-    localStorage.setItem('pedidos', JSON.stringify([]));
-  if (!localStorage.getItem('admin_user'))
-    localStorage.setItem('admin_user', 'admin');
-  if (!localStorage.getItem('admin_pass'))
-    localStorage.setItem('admin_pass', btoa('1234'));
-  if (!localStorage.getItem('admin_email'))
-    localStorage.setItem('admin_email', 'admin@dulzurahogar.com');
-  if (!localStorage.getItem('admin_nombre'))
-    localStorage.setItem('admin_nombre', 'Abuela Rosa');
-  if (!localStorage.getItem('admin_telefono'))
-    localStorage.setItem('admin_telefono', '5491112345678');
-  if (!localStorage.getItem('tema'))
-    localStorage.setItem('tema', 'claro');
+/* ═════════════════════════════════════════════
+   CUENTA SEGURA DEL DUEÑO (Supabase Auth)
+   Email interno determinístico (igual que el servidor):
+     minúsculas(usuario + "." + codigo), solo [a-z0-9.], + "@tiendalibre.app"
+═════════════════════════════════════════════ */
+function emailDueno(usuario, codigo) {
+  return (String(usuario) + '.' + String(codigo))
+           .toLowerCase()
+           .replace(/[^a-z0-9.]/g, '') + '@' + DOMINIO_DUENO;
 }
 
-/* ─── Tema ─── */
-function aplicarTema() {
-  const tema = localStorage.getItem('tema') || 'claro';
-  document.body.className = document.body.className
-    .replace(/tema-\S+/g, '').trim();
-  document.body.classList.add('tema-' + tema);
+// Garantiza que exista la cuenta Auth del dueño y deja la sesión iniciada.
+// Devuelve { ok, error }.
+async function asegurarCuentaSeguraDueno(codigo, usuario, pass) {
+  if (!pass || pass.length < 6) {
+    return { ok: false, error: 'La contraseña debe tener 6 caracteres o más.' };
+  }
+  const email = emailDueno(usuario, codigo);
+
+  // 1) Intentar ingresar directo
+  let r = await sbSignIn(email, pass);
+
+  // 2) Si no entró, puede ser primera vez (no existe) o clave desincronizada
+  if (!r.ok) {
+    const alta = await sbSignUp(email, pass);
+    if (alta.ok && alta.conSesion) {
+      r = { ok: true };
+    } else if (alta.ok && !alta.conSesion) {
+      // cuenta creada pero sin sesión → intentar ingresar
+      r = await sbSignIn(email, pass);
+    } else {
+      // Probablemente la cuenta ya existe con otra clave:
+      // sincronizamos la clave Auth con la de la licencia y reintentamos.
+      await sbRPC('sincronizar_clave_dueno',
+        { p_codigo: codigo, p_usuario: usuario, p_pass: pass }, { conAuth: false });
+      r = await sbSignIn(email, pass);
+    }
+  }
+
+  if (!r.ok) {
+    return { ok: false, error: r.error || 'No se pudo iniciar sesión. Revisá la contraseña (6+).' };
+  }
+
+  // 3) Sincronizar clave (idempotente) y vincular como dueño
+  await sbRPC('sincronizar_clave_dueno',
+    { p_codigo: codigo, p_usuario: usuario, p_pass: pass }, { conAuth: false });
+  await sbRPC('reclamar_dulzura', { p_codigo: codigo }, { conAuth: true });
+
+  // 4) Verificar que realmente quedó una sesión válida
+  const token = await sbToken();
+  if (!token) return { ok: false, error: 'No se pudo verificar la sesión. Probá de nuevo.' };
+  return { ok: true };
 }
 
-/* ─── Auth ─── */
-function loginAdmin(user, pass) {
-  const u = localStorage.getItem('admin_user') || 'admin';
-  let p = '1234';
-  try { p = atob(localStorage.getItem('admin_pass') || btoa('1234')); } catch (e) { p = '1234'; }
-  const okGuardado = (user === u && pass === p);
-  const okDefault  = (user === 'admin' && pass === '1234'); // acceso por defecto: nunca te deja afuera
-  if (okGuardado || okDefault) {
-    sessionStorage.setItem('admin_logged', 'true');
-    return true;
+/* ═════════════════════════════════════════════
+   LOGIN / LOGOUT del panel
+═════════════════════════════════════════════ */
+// Login del dueño: activa la licencia (si hace falta) + cuenta segura.
+// Devuelve { ok, error }.
+async function loginDueno(codigo, usuario, pass) {
+  codigo = (codigo || '').trim().toUpperCase();
+  usuario = (usuario || '').trim();
+
+  // 1) Validar/activar la licencia (RPC validar_licencia)
+  const lic = await activarLicencia(codigo);
+  if (!lic) return { ok: false, error: 'Código de licencia inválido o no encontrado.' };
+
+  // Si no escribieron usuario, usamos el de la licencia
+  if (!usuario) usuario = lic.usuario || '';
+  if (!usuario) return { ok: false, error: 'Falta el usuario (lo genera el panel).' };
+
+  if (!pass || pass.length < 6) {
+    return { ok: false, error: 'La contraseña debe tener 6 caracteres o más.' };
   }
-  return false;
+
+  // 2) Cuenta segura en la nube
+  const res = await asegurarCuentaSeguraDueno(codigo, usuario, pass);
+  if (!res.ok) return res;
+
+  // 3) Marcar sesión local y guardar usuario en la licencia
+  sessionStorage.setItem('admin_logged', 'true');
+  const guardada = obtenerLicencia() || {};
+  guardada.usuario = usuario;
+  guardarLicencia(guardada);
+  return { ok: true };
 }
 
 function isAdminLogged() {
-  return sessionStorage.getItem('admin_logged') === 'true';
+  return sessionStorage.getItem('admin_logged') === 'true' && !!sbObtenerSesion();
 }
 
-function logoutAdmin() {
+async function logoutAdmin() {
+  await sbSignOut();
   sessionStorage.removeItem('admin_logged');
   window.location.href = 'index.html';
 }
 
-/* ─── Recuperar contraseña ─── */
-function recuperarAdmin(email) {
-  const adminEmail = localStorage.getItem('admin_email');
-  if (email.trim().toLowerCase() !== adminEmail.trim().toLowerCase()) {
-    alert('El correo ingresado no coincide con el del administrador.');
-    return;
-  }
-  const pass = atob(localStorage.getItem('admin_pass'));
+// Cambio de contraseña desde el panel (actualiza la cuenta Auth). 6+ caracteres.
+async function cambiarPasswordAuth(actual, nueva) {
+  if (!nueva || nueva.length < 6) return { ok: false, error: 'La nueva contraseña debe tener 6+ caracteres.' };
+  const lic = obtenerLicencia();
+  if (!lic || !lic.codigo) return { ok: false, error: 'No hay licencia activa.' };
+  const usuario = lic.usuario || '';
+  const email = emailDueno(usuario, lic.codigo);
 
-  if (typeof emailjs !== 'undefined') {
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
-      to_email: email,
-      message: 'Tu contraseña de Dulzura del Hogar es: ' + pass
-    }).then(() => {
-      alert('✅ Contraseña enviada a ' + email);
-    }).catch(() => {
-      alert('⚠️ No se pudo enviar el correo. Verificá la configuración de EmailJS.');
+  // Verificar la actual reingresando
+  const v = await sbSignIn(email, actual);
+  if (!v.ok) return { ok: false, error: 'La contraseña actual es incorrecta.' };
+
+  const token = await sbToken();
+  try {
+    const res = await fetch(`${SB_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { apikey: SB_ANON, Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: nueva })
     });
-  } else {
-    alert('EmailJS no está configurado. Tu contraseña es: ' + pass);
+    if (!res.ok) {
+      const t = await res.text();
+      return { ok: false, error: 'No se pudo cambiar la contraseña. ' + t };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: 'No se pudo conectar con el servidor.' };
   }
 }
 
-/* ─── Helpers ─── */
-function getProductos() {
-  return JSON.parse(localStorage.getItem('productos') || '[]');
+/* ═════════════════════════════════════════════
+   RECUPERAR CONTRASEÑA (sin exponer claves)
+═════════════════════════════════════════════ */
+function recuperarAdmin(_email) {
+  alert('Para recuperar tu contraseña, contactá al proveedor con tu código de licencia:\n' + PROVEEDOR_MAIL);
 }
 
-function setProductos(arr) {
-  localStorage.setItem('productos', JSON.stringify(arr));
-}
-
-function getPedidos() {
-  return JSON.parse(localStorage.getItem('pedidos') || '[]');
-}
-
-function setPedidos(arr) {
-  localStorage.setItem('pedidos', JSON.stringify(arr));
-}
+/* ═════════════════════════════════════════════
+   DATOS (por ahora locales; la nube se conecta en el próximo paso)
+═════════════════════════════════════════════ */
+function getProductos() { return JSON.parse(localStorage.getItem('productos') || '[]'); }
+function setProductos(arr) { localStorage.setItem('productos', JSON.stringify(arr)); }
+function getPedidos()   { return JSON.parse(localStorage.getItem('pedidos') || '[]'); }
+function setPedidos(arr)   { localStorage.setItem('pedidos', JSON.stringify(arr)); }
+function getPromos()    { return JSON.parse(localStorage.getItem('promos') || '[]'); }
+function setPromos(arr)    { localStorage.setItem('promos', JSON.stringify(arr)); }
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
-
-function formatPrecio(n) {
-  return '$' + Number(n).toLocaleString('es-AR');
-}
-
+function formatPrecio(n) { return '$' + Number(n).toLocaleString('es-AR'); }
 function formatFecha(ts) {
   const d = new Date(ts);
   return d.toLocaleDateString('es-AR') + ' ' + d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
+// Borra TODAS las claves del inquilino (para arrancar limpio uno nuevo).
+function limpiarDatosInquilino() {
+  ['productos', 'promos', 'pedidos',
+   'app_nombre', 'app_emoji', 'app_logo',
+   'admin_nombre', 'admin_email', 'admin_telefono', 'tema'
+  ].forEach(k => localStorage.removeItem(k));
+}
+
+/* ─── Inicializar datos mínimos (sin contraseñas locales) ─── */
+function inicializarDatos() {
+  if (!localStorage.getItem('productos')) localStorage.setItem('productos', JSON.stringify([]));
+  if (!localStorage.getItem('promos'))    localStorage.setItem('promos', JSON.stringify([]));
+  if (!localStorage.getItem('pedidos'))   localStorage.setItem('pedidos', JSON.stringify([]));
+  if (!localStorage.getItem('tema'))      localStorage.setItem('tema', 'claro');
+}
+
+/* ─── Tema ─── */
+function aplicarTema() {
+  const tema = localStorage.getItem('tema') || 'claro';
+  document.body.className = document.body.className.replace(/tema-\S+/g, '').trim();
+  document.body.classList.add('tema-' + tema);
+}
+
 /* ─── Inicializar al cargar ─── */
 inicializarDatos();
 aplicarTema();
-
-/* ─── Hidratar desde la nube (1 sola vez por sesión) ─── */
-(async function dulzuraHidratarInicial() {
-  const codigo = _dulzuraCodigo();
-  if (!codigo) { _dulzuraPush = false; return; }            // sin licencia real → todo local
-  if (sessionStorage.getItem('dulzura_hidratado') === '1') { _dulzuraPush = true; return; }
-  const r = await dulzuraNubeCargar();
-  sessionStorage.setItem('dulzura_hidratado', '1');
-  _dulzuraPush = true;
-  if (r && r.changed) location.reload(); // refrescar para mostrar los datos de la nube
-})();

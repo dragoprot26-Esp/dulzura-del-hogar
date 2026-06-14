@@ -63,32 +63,30 @@
     <h2 class="modal-titulo">🔐 Acceso Administrador</h2>
     <div id="loginError" style="display:none;background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:0.85rem;font-weight:700;"></div>
     <div class="form-group">
+      <label for="loginCodigo">Código de licencia</label>
+      <input type="text" id="loginCodigo" placeholder="DULZ-..." autocomplete="off" style="text-transform:uppercase;">
+    </div>
+    <div class="form-group">
       <label for="loginUser">Usuario</label>
-      <input type="text" id="loginUser" placeholder="admin" autocomplete="off">
+      <input type="text" id="loginUser" placeholder="usuario del panel" autocomplete="off">
     </div>
     <div class="form-group">
       <label for="loginPass">Contraseña</label>
       <input type="password" id="loginPass" placeholder="••••••">
     </div>
+    <p style="font-size:0.74rem;color:var(--text2,#9ca3af);margin:-4px 0 10px;">La primera vez pedí los 3 datos al proveedor. Después solo usuario y contraseña.</p>
     <button class="btn btn-primary btn-block" id="loginBtn">Ingresar →</button>
     <button class="btn btn-ghost btn-block" id="recuperarBtn" style="margin-top:10px;font-size:0.82rem;">¿Olvidé mi contraseña?</button>
-    <button class="btn btn-ghost btn-block" id="linkActivarLic" style="margin-top:6px;font-size:0.82rem;">🔑 Primera vez — activar mi licencia</button>
-  </div>
-</div>
 
-<!-- MODAL LICENCIA -->
-<div class="modal-overlay" id="modalLicencia">
-  <div class="modal">
-    <button class="modal-close" aria-label="Cerrar">✕</button>
-    <h2 class="modal-titulo">🔑 Activar licencia</h2>
-    <p style="font-size:0.85rem;color:#555;margin-bottom:12px;">Ingresá el código que te dio tu proveedor (ej: <strong>DULZ-PREM-2026-XXXX</strong>). Carga tu tienda en este dispositivo.</p>
-    <div id="licenciaMsg" style="display:none;padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:0.85rem;font-weight:700;"></div>
-    <div class="form-group">
-      <label for="inputCodigoPub">Código de licencia</label>
-      <input type="text" id="inputCodigoPub" placeholder="DULZ-PREM-2026-XXXX" autocomplete="off" style="text-transform:uppercase;">
+    <!-- Separador biometría -->
+    <div id="separadorBiometria" style="display:none;align-items:center;gap:10px;margin:14px 0 4px;">
+      <div style="flex:1;height:1px;background:var(--border,#e5d5c5);"></div>
+      <span style="font-size:0.78rem;color:var(--text2,#9ca3af);">o</span>
+      <div style="flex:1;height:1px;background:var(--border,#e5d5c5);"></div>
     </div>
-    <button class="btn btn-primary btn-block" id="activarLicenciaBtn">Activar →</button>
-    <p style="font-size:0.78rem;color:#888;margin-top:10px;text-align:center;">Después de activar, entrá con el <strong>usuario y contraseña</strong> que te dio tu proveedor.</p>
+    <button class="btn btn-outline btn-block" id="btnBiometria" style="display:none;font-size:0.9rem;">
+      🔒 Ingresar con huella / PIN
+    </button>
   </div>
 </div>
 
@@ -123,8 +121,10 @@
   </div>
 </div>
 
-<script src="js/comun.js"></script>
-<script src="js/licencia.js"></script>
-<script src="js/index.js"></script>
+<!-- ===== SCRIPTS ===== -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="js/comun.js?v=2"></script>
+<script src="js/licencia.js?v=2"></script>
+<script src="js/index.js?v=2"></script>
 </body>
 </html>
