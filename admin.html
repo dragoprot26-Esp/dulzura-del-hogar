@@ -6,6 +6,15 @@
   <title>Panel Admin — Dulzura del Hogar</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/estilos.css">
+  <style>
+    @media (max-width: 600px) {
+      .navbar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
+      .navbar-actions { gap: 6px; flex-wrap: wrap; }
+      .navbar-actions .btn, #btnVerPublica, #btnLogout { font-size: 0.72rem; padding: 6px 9px; }
+      .bell-btn { font-size: 1rem; padding: 4px 8px; }
+      #navNombreApp { font-size: 1rem; }
+    }
+  </style>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 </head>
 <body>
@@ -292,6 +301,16 @@
         <button class="btn btn-primary" id="btnGuardarAdmin">💾 Guardar cambios</button>
       </div>
 
+      <!-- Equipos con acceso -->
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">💻 Equipos con acceso</h3>
+          <button class="btn btn-ghost btn-sm" onclick="renderEquipos()">🔄</button>
+        </div>
+        <p class="text-muted" style="font-size:0.82rem;">Si un equipo se perdió o ya no se usa, tocá <strong>✕ Cerrar</strong> para liberar el lugar al instante.</p>
+        <div id="listaEquipos"></div>
+      </div>
+
       <!-- Compartir app -->
       <div class="panel-card">
         <div class="panel-card-header">
@@ -485,8 +504,8 @@
   <iframe id="previewFrame" title="Vista previa" style="width:100%;height:calc(100% - 50px);border:0;background:#fff;"></iframe>
 </div>
 
-<script src="js/comun.js?v=9"></script>
-<script src="js/licencia.js?v=9"></script>
-<script src="js/admin.js?v=9"></script>
+<script src="js/comun.js?v=10"></script>
+<script src="js/licencia.js?v=10"></script>
+<script src="js/admin.js?v=10"></script>
 </body>
 </html>
