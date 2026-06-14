@@ -1,5 +1,7 @@
 /* ===== index.js — Dulzura del Hogar (página pública) ===== */
 
+let modoLogin = 'dueno';   // 'dueno' | 'colab'
+
 document.addEventListener('DOMContentLoaded', async () => {
   await cargarPublicoSiCorresponde();
   aplicarApariencia();
@@ -181,6 +183,10 @@ function setupEventosPublicos() {
     if (email) recuperarAdmin(email);
   });
 
+  // Selector Dueño / Colaborador
+  document.getElementById('modoDueno')?.addEventListener('click', () => setModoLogin('dueno'));
+  document.getElementById('modoColab')?.addEventListener('click', () => setModoLogin('colab'));
+
   // Agregar al carrito desde productos
   document.getElementById('productos')?.addEventListener('click', e => {
     const btn = e.target.closest('.btn-agregar');
@@ -204,6 +210,20 @@ function setupEventosPublicos() {
   document.getElementById('btnCompartirMail')?.addEventListener('click', compartirAmigosMail);
 }
 
+function setModoLogin(modo) {
+  modoLogin = modo;
+  const d = document.getElementById('modoDueno');
+  const c = document.getElementById('modoColab');
+  if (d) d.className = 'btn btn-sm ' + (modo === 'dueno' ? 'btn-primary' : 'btn-outline');
+  if (c) c.className = 'btn btn-sm ' + (modo === 'colab' ? 'btn-primary' : 'btn-outline');
+  const lbl = document.querySelector('label[for="loginCodigo"]');
+  if (lbl) lbl.textContent = modo === 'colab' ? 'Código del local' : 'Código de licencia';
+  const hint = document.getElementById('loginHint');
+  if (hint) hint.textContent = modo === 'colab'
+    ? 'Colaborador: poné el código del local, tu nombre y una clave tuya (6+). La primera vez crea tu acceso.'
+    : 'Dueño: la primera vez pedí los 3 datos al proveedor. Después solo usuario y contraseña.';
+}
+
 async function intentarLogin() {
   const errEl  = document.getElementById('loginError');
   const lic    = obtenerLicencia();
@@ -217,7 +237,9 @@ async function intentarLogin() {
   const btn = document.getElementById('loginBtn');
   if (btn) { btn.disabled = true; btn.textContent = 'Ingresando...'; }
 
-  const res = await loginDueno(codigo, user, pass);
+  const res = (modoLogin === 'colab')
+    ? await loginColab(codigo, user, pass)
+    : await loginDueno(codigo, user, pass);
 
   if (btn) { btn.disabled = false; btn.textContent = 'Ingresar →'; }
 

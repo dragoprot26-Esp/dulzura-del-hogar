@@ -171,6 +171,13 @@ function emailDueno(usuario, codigo) {
            .replace(/[^a-z0-9.]/g, '') + '@' + DOMINIO_DUENO;
 }
 
+// Email interno para colaboradores (espacio aparte para no chocar con el dueño).
+function emailColab(usuario, codigo) {
+  return ('colab.' + String(usuario) + '.' + String(codigo))
+           .toLowerCase()
+           .replace(/[^a-z0-9.]/g, '') + '@' + DOMINIO_DUENO;
+}
+
 // Garantiza que exista la cuenta Auth del dueño y deja la sesión iniciada.
 // Devuelve { ok, error }.
 async function asegurarCuentaSeguraDueno(codigo, usuario, pass) {
@@ -243,7 +250,46 @@ async function loginDueno(codigo, usuario, pass) {
   sessionStorage.setItem('admin_logged', 'true');
   const guardada = obtenerLicencia() || {};
   guardada.usuario = usuario;
+  guardada.email = emailDueno(usuario, codigo);
+  guardada.rol = 'dueno';
   guardarLicencia(guardada);
+  return { ok: true };
+}
+
+// Login de COLABORADOR: se une al local con su propia clave.
+async function loginColab(codigo, usuario, pass) {
+  codigo = (codigo || '').trim().toUpperCase();
+  usuario = (usuario || '').trim();
+  if (!codigo)  return { ok: false, error: 'Ingresá el código del local.' };
+  if (!usuario) return { ok: false, error: 'Ingresá tu nombre de usuario.' };
+  if (!pass || pass.length < 6) return { ok: false, error: 'La contraseña debe tener 6 caracteres o más.' };
+
+  // 1) Verificar que el local exista y esté activo
+  const ver = await sbRPC('verificar_colab_dulzura', { p_codigo: codigo }, { conAuth: false });
+  const info = (ver.ok && Array.isArray(ver.data)) ? ver.data[0] : (ver.ok ? ver.data : null);
+  if (!info) return { ok: false, error: 'Código de local inválido o inactivo.' };
+
+  // 2) Cuenta del colaborador (la crea la primera vez)
+  const email = emailColab(usuario, codigo);
+  let r = await sbSignIn(email, pass);
+  if (!r.ok) {
+    const alta = await sbSignUp(email, pass);
+    if (alta.ok && alta.conSesion) r = { ok: true };
+    else r = await sbSignIn(email, pass);
+  }
+  if (!r.ok) return { ok: false, error: r.error || 'No se pudo iniciar sesión. Revisá tu clave (6+).' };
+
+  // 3) Vincularse como colaborador del local
+  const u = await sbRPC('unirse_colab_dulzura', { p_codigo: codigo }, { conAuth: true });
+  if (!u.ok) return { ok: false, error: 'No se pudo unir al local. Probá de nuevo.' };
+
+  // 4) Guardar la licencia local del colaborador
+  sessionStorage.setItem('admin_logged', 'true');
+  guardarLicencia({
+    valida: true, codigo, usuario, email, rol: 'colab',
+    plan: 'colaborador', temporal: false,
+    negocio: info.nombre_negocio || '', color: info.color_principal || ''
+  });
   return { ok: true };
 }
 
@@ -263,7 +309,7 @@ async function cambiarPasswordAuth(actual, nueva) {
   const lic = obtenerLicencia();
   if (!lic || !lic.codigo) return { ok: false, error: 'No hay licencia activa.' };
   const usuario = lic.usuario || '';
-  const email = emailDueno(usuario, lic.codigo);
+  const email = lic.email || emailDueno(usuario, lic.codigo);
 
   // Verificar la actual reingresando
   const v = await sbSignIn(email, actual);
