@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   actualizarLicenciaUI();
   mostrarInfoLicencia();
   cargarLinkTienda();
+
+  // Auto-actualización: cada 20s revisa la nube y muestra nuevos encargos solos
+  setInterval(async () => {
+    if (_pushPendiente) return;                                   // no pisar un guardado en curso
+    if (document.querySelector('.modal-overlay.activo')) return;  // no molestar si está editando
+    const ov = document.getElementById('previewOverlay');
+    if (ov && ov.style.display === 'block') return;               // ni durante la vista previa
+    const ok = await nubeTraer();
+    if (ok) { cargarPedidosAdmin(); cargarProductosAdmin(); cargarPromosAdmin(); }
+  }, 20000);
 });
 
 /* ─── Navegación sidebar ─── */
