@@ -19,6 +19,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   cargarProductosAdmin();
   cargarPedidosAdmin();
   cargarPromosAdmin();
+  cargarEntregas();
   sincronizarSelectorTema();
   actualizarLicenciaUI();
   mostrarInfoLicencia();
@@ -31,7 +32,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ov = document.getElementById('previewOverlay');
     if (ov && ov.style.display === 'block') return;               // ni durante la vista previa
     const ok = await nubeTraer();
-    if (ok) { cargarPedidosAdmin(); cargarProductosAdmin(); cargarPromosAdmin(); }
+    if (ok) { cargarPedidosAdmin(); cargarProductosAdmin(); cargarPromosAdmin(); cargarEntregas(); }
   }, 20000);
 });
 
@@ -547,10 +548,66 @@ function renderPedido(p) {
 }
 
 function completarPedido(id) {
-  const pedidos = getPedidos().map(p => p.id === id ? { ...p, estado: 'completado' } : p);
+  const pedidos = getPedidos().map(p => p.id === id
+    ? { ...p, estado: 'completado', atendidoPor: nombreActual(), rolUsuario: rolActual(), fechaEntrega: Date.now() }
+    : p);
   setPedidos(pedidos);
   cargarPedidosAdmin();
+  cargarEntregas();
   toast('✅ Encargo marcado como completado');
+}
+
+/* ══════════════════════════════════════════
+   DASHBOARD DE ENTREGAS
+══════════════════════════════════════════ */
+function nombreActual() { const l = obtenerLicencia() || {}; return l.usuario || 'Administrador'; }
+function rolActual()    { const l = obtenerLicencia() || {}; return l.rol === 'colab' ? 'Colaborador' : 'Dueño'; }
+
+function detallePedido(p) {
+  if (Array.isArray(p.items) && p.items.length) {
+    return p.items.map(i => `${i.nombre} ×${i.cantidad}`).join(', ');
+  }
+  return `${p.producto || '—'}${p.cantidad ? ' ×' + p.cantidad : ''}`;
+}
+
+function cargarEntregas() {
+  const cont = document.getElementById('listaEntregas');
+  const resumen = document.getElementById('entregasResumen');
+  if (!cont) return;
+
+  const pedidos = getPedidos().slice().sort((a, b) => b.fecha - a.fecha);
+  const comp = pedidos.filter(p => p.estado === 'completado');
+  const pend = pedidos.filter(p => p.estado !== 'completado');
+
+  // Resumen
+  if (resumen) {
+    const porPersona = {};
+    comp.forEach(p => { const k = p.atendidoPor || '—'; porPersona[k] = (porPersona[k] || 0) + 1; });
+    const chips = Object.entries(porPersona)
+      .map(([k, v]) => `<span style="display:inline-block;background:var(--primary-light,#f3e3d8);color:var(--primary-dark,#7a3b1d);border-radius:999px;padding:3px 10px;margin:2px;font-size:0.8rem;font-weight:700;">${k}: ${v}</span>`)
+      .join(' ') || '<span class="text-muted" style="font-size:0.85rem;">Sin entregas completadas aún.</span>';
+    resumen.innerHTML = `
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <span style="font-weight:700;">📦 Total: ${pedidos.length}</span>
+        <span style="font-weight:700;color:var(--success,#16a34a);">✅ Entregadas: ${comp.length}</span>
+        <span style="font-weight:700;color:var(--warning,#b45309);">⏳ Pendientes: ${pend.length}</span>
+      </div>
+      <div style="font-size:0.85rem;"><strong>Entregas por persona:</strong><br>${chips}</div>`;
+  }
+
+  if (!pedidos.length) {
+    cont.innerHTML = `<tr><td colspan="6" class="text-center text-muted" style="padding:24px;">Todavía no hay pedidos.</td></tr>`;
+    return;
+  }
+  cont.innerHTML = pedidos.map(p => `
+    <tr>
+      <td style="white-space:nowrap;font-size:0.82rem;">${formatFecha(p.fecha)}</td>
+      <td><strong>${p.comprador || '—'}</strong>${p.telefono ? `<br><span class="text-muted" style="font-size:0.78rem;">📱 ${p.telefono}</span>` : ''}</td>
+      <td style="font-size:0.83rem;">${detallePedido(p)}</td>
+      <td style="white-space:nowrap;">${formatPrecio(p.total || 0)}</td>
+      <td><span class="estado-badge estado-${p.estado}">${p.estado}</span></td>
+      <td>${p.atendidoPor ? `${p.atendidoPor} <span class="text-muted" style="font-size:0.78rem;">(${p.rolUsuario || ''})</span>` : '—'}</td>
+    </tr>`).join('');
 }
 
 function abrirDrawerPedidos() {
