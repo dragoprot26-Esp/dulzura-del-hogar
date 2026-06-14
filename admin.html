@@ -38,6 +38,7 @@
       <li><a href="#" data-sec="secProductos">📦 Productos</a></li>
       <li><a href="#" data-sec="secPromos">🎁 Promociones</a></li>
       <li><a href="#" data-sec="secPedidos">🛒 Pedidos</a></li>
+      <li><a href="#" data-sec="secEntregas">📊 Entregas</a></li>
       <li><a href="#" data-sec="secTemas">🎨 Apariencia</a></li>
       <li><a href="#" data-sec="secLicencia">🔑 Licencia</a></li>
       <li><a href="#" data-sec="secCuenta">👤 Mi cuenta</a></li>
@@ -135,6 +136,32 @@
           <h3 class="panel-card-title">✅ Encargos completados</h3>
         </div>
         <div id="listaPedidosComp"></div>
+      </div>
+    </section>
+
+    <!-- ═══ ENTREGAS (DASHBOARD) ═══ -->
+    <section class="admin-section" id="secEntregas">
+      <div class="panel-card">
+        <div class="panel-card-header">
+          <h3 class="panel-card-title">📊 Entregas</h3>
+          <button class="btn btn-ghost btn-sm" onclick="cargarEntregas()">🔄 Actualizar</button>
+        </div>
+        <div id="entregasResumen" style="margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;">
+          <table class="tabla-admin">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Pedido</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Atendido por</th>
+              </tr>
+            </thead>
+            <tbody id="listaEntregas"></tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -453,8 +480,8 @@
   <iframe id="previewFrame" title="Vista previa" style="width:100%;height:calc(100% - 50px);border:0;background:#fff;"></iframe>
 </div>
 
-<script src="js/comun.js?v=5"></script>
-<script src="js/licencia.js?v=5"></script>
-<script src="js/admin.js?v=5"></script>
+<script src="js/comun.js?v=7"></script>
+<script src="js/licencia.js?v=7"></script>
+<script src="js/admin.js?v=7"></script>
 </body>
 </html>
