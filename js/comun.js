@@ -306,6 +306,7 @@ function isAdminLogged() {
 }
 
 async function logoutAdmin() {
+  await liberarDispositivo();   // libera el lugar antes de salir
   await sbSignOut();
   sessionStorage.removeItem('admin_logged');
   window.location.href = 'index.html';
@@ -499,28 +500,52 @@ async function registrarDispositivo() {
     await nubeTraer();                 // trae la lista actual de equipos
     const disp = getDispositivos();
     const id = deviceId();
-    if (disp[id]) {                    // este equipo ya estaba habilitado
+    const VENTANA = 3 * 60 * 60 * 1000; // 3 horas: equipo inactivo libera su lugar
+    const ahora = Date.now();
+
+    // Liberar equipos inactivos (cerraron sin "Cerrar sesión")
+    Object.keys(disp).forEach(k => {
+      if (!disp[k] || !disp[k].ts || (ahora - disp[k].ts) > VENTANA) delete disp[k];
+    });
+
+    if (disp[id]) {                    // este equipo ya estaba habilitado → renovar
+      disp[id].ts = ahora;
       if (!localStorage.getItem('operador_nombre') && disp[id].nombre) setOperador(disp[id].nombre);
+      setDispositivos(disp);
+      await nubeGuardar();
       return { ok: true };
     }
+
     const max = maxPersonal();
     if (Object.keys(disp).length >= max) {
-      return { ok: false, error: `Esta tienda ya tiene ${max} accesos habilitados.\nPara sumar más personal, escribí a ${PROVEEDOR_MAIL}` };
+      setDispositivos(disp);
+      await nubeGuardar();             // guardar la limpieza igual
+      return { ok: false, error: `Esta tienda ya tiene ${max} accesos activos.\nPara sumar más personal, escribí a ${PROVEEDOR_MAIL}` };
     }
+
     let nombre = localStorage.getItem('operador_nombre');
     if (!nombre && typeof prompt === 'function') {
       nombre = prompt('¿Cómo te llamás? (para registrar quién atiende los pedidos)') || '';
     }
     nombre = (nombre || '').trim() || 'Operador';
     setOperador(nombre);
-    disp[id] = { nombre, ts: Date.now() };
+    disp[id] = { nombre, ts: ahora };
     setDispositivos(disp);
     await nubeGuardar();               // sube la lista actualizada
     return { ok: true };
   } catch (e) {
     console.warn('registrarDispositivo:', e);
-    return { ok: true };               // fail-open
+    return { ok: true };               // fail-open (nunca bloquea por error)
   }
+}
+
+// Libera el lugar de este equipo (se llama al cerrar sesión).
+async function liberarDispositivo() {
+  try {
+    const disp = getDispositivos();
+    const id = deviceId();
+    if (disp[id]) { delete disp[id]; setDispositivos(disp); await nubeGuardar(); }
+  } catch (e) { /* no-op */ }
 }
 
 // Borra TODAS las claves del inquilino (para arrancar limpio uno nuevo).
