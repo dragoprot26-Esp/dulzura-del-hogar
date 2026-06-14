@@ -657,6 +657,26 @@ function compartirNativo() {
 }
 
 /* ══════════════════════════════════════════
+   VISTA PREVIA (ojo) — ver la página pública
+══════════════════════════════════════════ */
+async function verPaginaPublica() {
+  toast('🔄 Actualizando vista previa...');
+  await nubeGuardar();                 // sube lo último antes de mostrar
+  const url = getLinkTienda();         // index.html?codigo=...
+  const frame = document.getElementById('previewFrame');
+  const ov = document.getElementById('previewOverlay');
+  if (frame) frame.src = url;
+  if (ov) ov.style.display = 'block';
+}
+
+function cerrarPreview() {
+  const ov = document.getElementById('previewOverlay');
+  const frame = document.getElementById('previewFrame');
+  if (ov) ov.style.display = 'none';
+  if (frame) frame.src = 'about:blank';
+}
+
+/* ══════════════════════════════════════════
    LICENCIA
 ══════════════════════════════════════════ */
 function actualizarLicenciaUI() {
@@ -716,6 +736,9 @@ function configurarEventosAdmin() {
   document.getElementById('btnLogout')?.addEventListener('click', () => {
     if (confirm('¿Cerrar sesión?')) logoutAdmin();
   });
+
+  // Ver / cerrar vista previa de la página pública
+  document.getElementById('btnVerPublica')?.addEventListener('click', verPaginaPublica);
 
   // Apariencia — logo y nombre
   document.getElementById('btnGuardarApariencia')?.addEventListener('click', guardarApariencia);
