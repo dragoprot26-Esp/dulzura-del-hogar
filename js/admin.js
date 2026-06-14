@@ -8,7 +8,11 @@
 })();
 
 /* ─── DOMContentLoaded ─── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  aplicarTema();
+  configurarEventosAdmin();
+  // Traer lo último de la nube antes de mostrar (multi-dispositivo / colaborador)
+  await nubeTraer();
   aplicarTema();
   cargarApariencia();
   cargarDatosAdmin();
@@ -16,7 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
   cargarPedidosAdmin();
   cargarPromosAdmin();
   sincronizarSelectorTema();
-  configurarEventosAdmin();
   actualizarLicenciaUI();
   mostrarInfoLicencia();
   cargarLinkTienda();
@@ -94,6 +97,7 @@ function guardarApariencia() {
   localStorage.setItem('app_nombre', nombre);
   localStorage.setItem('app_emoji',  emoji);
   localStorage.setItem('app_logo',   logo);
+  colaPush();
 
   actualizarNavBrand(nombre, emoji, logo);
   actualizarPreviewApariencia(nombre, emoji, logo);
@@ -139,6 +143,7 @@ function guardarDatosAdmin() {
   if (n) localStorage.setItem('admin_nombre', n);
   if (e) localStorage.setItem('admin_email', e);
   if (t) localStorage.setItem('admin_telefono', t);
+  colaPush();
   const saludo = document.getElementById('saludoAdmin');
   if (saludo) saludo.textContent = `¡Hola, ${(n||'').split(' ')[0]}! 👋`;
   cargarLinkTienda();
@@ -362,9 +367,6 @@ function totalImagenesInquilino() {
 let editandoPromoId = null;
 let imagenPromoActual = '';
 
-function getPromos() { return JSON.parse(localStorage.getItem('promos') || '[]'); }
-function setPromos(arr) { localStorage.setItem('promos', JSON.stringify(arr)); }
-
 function cargarPromosAdmin() {
   const cont = document.getElementById('listaPromosAdmin');
   if (!cont) return;
@@ -573,6 +575,7 @@ function seleccionarTema(tema) {
     opt.classList.toggle('seleccionado', opt.dataset.tema === tema);
   });
   localStorage.setItem('tema', tema);
+  colaPush();
   aplicarTema();
   toast('🎨 Tema aplicado: ' + tema);
 }
@@ -581,7 +584,9 @@ function seleccionarTema(tema) {
    COMPARTIR
 ══════════════════════════════════════════ */
 function getLinkTienda() {
-  return window.location.href.replace('admin.html', 'index.html');
+  const lic = obtenerLicencia();
+  const base = window.location.href.replace('admin.html', 'index.html').split('?')[0];
+  return (lic && lic.codigo) ? `${base}?codigo=${encodeURIComponent(lic.codigo)}` : base;
 }
 
 function cargarLinkTienda() {
