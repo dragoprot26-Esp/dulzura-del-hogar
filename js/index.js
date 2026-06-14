@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   cargarPromociones();
   cargarFooter();
   setupEventosPublicos();
+  actualizarBadgeCarrito();
 });
 
 // Si la URL trae ?codigo=DULZ-..., mostramos esa tienda leyendo de la nube.
@@ -92,8 +93,8 @@ function cargarProductos() {
               ${Object.entries(p.extras).map(([k,v]) => `<span style="margin-right:6px;">📌 <strong>${k}:</strong> ${v}</span>`).join('')}
             </div>` : ''}
         <div class="producto-precio">${formatPrecio(p.precio)}</div>
-        <button class="btn btn-primary w-full btn-encargar" data-id="${p.id}" data-nombre="${p.nombre}">
-          🛒 Encargar
+        <button class="btn btn-primary w-full btn-agregar" data-id="${p.id}">
+          🛒 Agregar al carrito
         </button>
       </div>
     </div>
@@ -116,6 +117,7 @@ function cargarPromociones() {
         <div class="promo-titulo">${pr.titulo}</div>
         ${pr.descripcion ? `<p style="font-size:0.83rem;color:var(--text2);">${pr.descripcion}</p>` : ''}
         ${pr.precio ? `<div style="font-weight:700;color:var(--primary);margin:6px 0;">${formatPrecio(pr.precio)}</div>` : ''}
+        <button class="btn btn-primary btn-sm w-full btn-agregar-promo" data-id="${pr.id}" style="margin-bottom:6px;">🛒 Agregar al carrito</button>
         <a href="https://wa.me/${adminTel}?text=${encodeURIComponent('Hola! Me interesa la promoción: ' + pr.titulo)}" target="_blank" class="btn btn-ghost btn-sm w-full" style="text-decoration:none;">📩 Consultar</a>
       </div>`).join('');
   } else {
@@ -179,22 +181,27 @@ function setupEventosPublicos() {
     if (email) recuperarAdmin(email);
   });
 
+  // Agregar al carrito desde productos
   document.getElementById('productos')?.addEventListener('click', e => {
-    const btn = e.target.closest('.btn-encargar');
+    const btn = e.target.closest('.btn-agregar');
     if (!btn) return;
-    const prod = getProductos().find(p => p.id === btn.dataset.id);
-    if (!prod) return;
-    document.getElementById('pedidoProductoId').value    = prod.id;
-    document.getElementById('pedidoProductoNombre').textContent = prod.nombre;
-    document.getElementById('pedidoPrecio').textContent  = formatPrecio(prod.precio);
-    ['pedidoNombre','pedidoTelefono','pedidoDireccion'].forEach(id => {
-      const el = document.getElementById(id); if(el) el.value = '';
-    });
-    document.getElementById('pedidoCantidad').value = 1;
-    document.getElementById('modalPedido').classList.add('activo');
+    agregarAlCarrito(btn.dataset.id, 'producto');
   });
 
-  document.getElementById('enviarPedido')?.addEventListener('click', enviarPedido);
+  // Agregar al carrito desde promociones
+  document.getElementById('contenidoPromos')?.addEventListener('click', e => {
+    const btn = e.target.closest('.btn-agregar-promo');
+    if (!btn) return;
+    agregarAlCarrito(btn.dataset.id, 'promo');
+  });
+
+  // Carrito y compartir
+  document.getElementById('btnCarrito')?.addEventListener('click', abrirCarrito);
+  document.getElementById('btnPedidoFooter')?.addEventListener('click', abrirCarrito);
+  document.getElementById('enviarCarrito')?.addEventListener('click', enviarPedidoCarrito);
+  document.getElementById('vaciarCarrito')?.addEventListener('click', () => { vaciarCarrito(); mostrarToast('Carrito vaciado'); });
+  document.getElementById('btnCompartirWA')?.addEventListener('click', compartirAmigosWA);
+  document.getElementById('btnCompartirMail')?.addEventListener('click', compartirAmigosMail);
 }
 
 async function intentarLogin() {
@@ -285,6 +292,118 @@ function enviarPedido() {
   }
 
   mostrarToast(`✅ ¡Encargo enviado! Te contactaremos pronto, ${nombre.split(' ')[0]} 🎉`);
+}
+
+/* ═════════════════════════════════════════════
+   CARRITO
+═════════════════════════════════════════════ */
+function getCarrito() {
+  try { return JSON.parse(sessionStorage.getItem('carrito') || '[]'); }
+  catch (e) { return []; }
+}
+function setCarrito(c) {
+  sessionStorage.setItem('carrito', JSON.stringify(c));
+  actualizarBadgeCarrito();
+}
+function actualizarBadgeCarrito() {
+  const n = getCarrito().reduce((s, i) => s + i.cantidad, 0);
+  const b = document.getElementById('cartBadge');
+  if (b) { b.textContent = n; b.style.display = n > 0 ? 'inline-block' : 'none'; }
+}
+function buscarItem(id, tipo) {
+  if (tipo === 'promo') return JSON.parse(localStorage.getItem('promos') || '[]').find(p => p.id === id);
+  return getProductos().find(p => p.id === id);
+}
+function agregarAlCarrito(id, tipo) {
+  const it = buscarItem(id, tipo);
+  if (!it) return;
+  const c = getCarrito();
+  const linea = c.find(x => x.id === id && x.tipo === tipo);
+  if (linea) linea.cantidad++;
+  else c.push({ id, tipo, nombre: it.titulo || it.nombre, precio: Number(it.precio) || 0, cantidad: 1 });
+  setCarrito(c);
+  mostrarToast('🛒 Agregado al carrito');
+}
+function cambiarCantidad(id, tipo, delta) {
+  const c = getCarrito();
+  const l = c.find(x => x.id === id && x.tipo === tipo);
+  if (!l) return;
+  l.cantidad += delta;
+  if (l.cantidad <= 0) c.splice(c.indexOf(l), 1);
+  setCarrito(c);
+  renderCarrito();
+}
+function vaciarCarrito() { setCarrito([]); renderCarrito(); }
+function abrirCarrito() {
+  renderCarrito();
+  document.getElementById('modalCarrito').classList.add('activo');
+}
+function renderCarrito() {
+  const cont = document.getElementById('carritoItems');
+  if (!cont) return;
+  const c = getCarrito();
+  if (!c.length) {
+    cont.innerHTML = '<p class="text-muted" style="text-align:center;padding:16px;">Tu carrito está vacío. Agregá productos o promos 🛒</p>';
+  } else {
+    cont.innerHTML = c.map(l => `
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border,#e5d5c5);">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;">${l.nombre}</div>
+          <div style="font-size:0.8rem;color:var(--text2);">${formatPrecio(l.precio)} c/u</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="cambiarCantidad('${l.id}','${l.tipo}',-1)">−</button>
+        <span style="min-width:22px;text-align:center;font-weight:700;">${l.cantidad}</span>
+        <button class="btn btn-ghost btn-sm" onclick="cambiarCantidad('${l.id}','${l.tipo}',1)">+</button>
+        <div style="min-width:72px;text-align:right;font-weight:700;">${formatPrecio(l.precio * l.cantidad)}</div>
+      </div>`).join('');
+  }
+  const total = c.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const tEl = document.getElementById('carritoTotal');
+  if (tEl) tEl.textContent = formatPrecio(total);
+}
+async function enviarPedidoCarrito() {
+  const errEl = document.getElementById('carritoError');
+  const c = getCarrito();
+  if (!c.length) { mostrarError(errEl, 'El carrito está vacío.'); return; }
+  const nombre = document.getElementById('cartNombre').value.trim();
+  const tel    = document.getElementById('cartTelefono').value.trim();
+  const dir    = document.getElementById('cartDireccion').value.trim();
+  if (!nombre || !tel) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
+
+  const total = c.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const appNombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
+
+  // Registrar el pedido en la nube del negocio (si está la función disponible)
+  const codigo = (new URLSearchParams(location.search).get('codigo') || '').trim().toUpperCase();
+  if (codigo) {
+    const pedido = { id: uid(), items: c, total, comprador: nombre, telefono: tel, direccion: dir, fecha: Date.now(), estado: 'pendiente' };
+    try { await sbRPC('dulzura_nuevo_pedido', { p_codigo: codigo, p_pedido: pedido }, { conAuth: false }); } catch (e) { /* sigue por WhatsApp igual */ }
+  }
+
+  // Armar el mensaje de WhatsApp al negocio
+  const lineas = c.map(i => `• ${i.nombre} × ${i.cantidad} — ${formatPrecio(i.precio * i.cantidad)}`).join('\n');
+  const msg = `🛒 *Nuevo pedido — ${appNombre}*\n\n👤 *Cliente:* ${nombre}\n📱 *Teléfono:* ${tel}${dir ? '\n📍 *Dirección:* ' + dir : ''}\n\n${lineas}\n\n*Total: ${formatPrecio(total)}*`;
+  const adminTel = (localStorage.getItem('admin_telefono') || '').replace(/\D/g, '');
+  if (adminTel) window.open(`https://wa.me/${adminTel}?text=${encodeURIComponent(msg)}`, '_blank');
+
+  vaciarCarrito();
+  document.getElementById('modalCarrito').classList.remove('activo');
+  mostrarToast(`✅ ¡Pedido enviado! Gracias, ${nombre.split(' ')[0]} 🎉`);
+}
+
+/* ═════════════════════════════════════════════
+   COMPARTIR A AMIGOS (página pública)
+═════════════════════════════════════════════ */
+function compartirAmigosWA() {
+  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
+  const texto = `🍰 Mirá la tienda de *${nombre}*:\n${location.href}`;
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+}
+function compartirAmigosMail() {
+  const nombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
+  const asunto = `Te comparto ${nombre}`;
+  const cuerpo = `¡Hola!\nMirá la tienda de ${nombre}:\n${location.href}`;
+  window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
 }
 
 function mostrarError(el, msg) {
