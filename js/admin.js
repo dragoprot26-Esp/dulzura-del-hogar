@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   cargarPedidosAdmin();
   cargarPromosAdmin();
   cargarEntregas();
+  renderEquipos();
   sincronizarSelectorTema();
   actualizarLicenciaUI();
   mostrarInfoLicencia();
@@ -32,7 +33,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const ov = document.getElementById('previewOverlay');
     if (ov && ov.style.display === 'block') return;               // ni durante la vista previa
     const ok = await nubeTraer();
-    if (ok) { cargarPedidosAdmin(); cargarProductosAdmin(); cargarPromosAdmin(); cargarEntregas(); }
+    if (ok) {
+      // Si este equipo fue cerrado de forma remota (✕), cerramos sesión solo
+      if (localStorage.getItem('registrado') === '1' && !getDispositivos()[deviceId()]) {
+        await logoutAdmin();
+        return;
+      }
+      cargarPedidosAdmin(); cargarProductosAdmin(); cargarPromosAdmin(); cargarEntregas(); renderEquipos();
+    }
   }, 20000);
 });
 
@@ -571,6 +579,38 @@ function detallePedido(p) {
     return p.items.map(i => `${i.nombre} ×${i.cantidad}`).join(', ');
   }
   return `${p.producto || '—'}${p.cantidad ? ' ×' + p.cantidad : ''}`;
+}
+
+/* ══════════════════════════════════════════
+   EQUIPOS CON ACCESO (multi-dispositivo)
+══════════════════════════════════════════ */
+function renderEquipos() {
+  const cont = document.getElementById('listaEquipos');
+  if (!cont) return;
+  const disp = getDispositivos();
+  const yo = deviceId();
+  const ids = Object.keys(disp);
+  if (!ids.length) {
+    cont.innerHTML = '<p class="text-muted" style="font-size:0.85rem;">No hay equipos conectados.</p>';
+    return;
+  }
+  cont.innerHTML = ids.map(id => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border,#e5d5c5);">
+      <div style="flex:1;min-width:0;">
+        <strong>${disp[id].nombre || 'Equipo'}</strong>
+        ${id === yo ? '<span class="text-muted" style="font-size:0.78rem;"> (este equipo)</span>' : ''}
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="kickDispositivo('${id}')">✕ Cerrar</button>
+    </div>`).join('');
+}
+
+async function kickDispositivo(id) {
+  if (!confirm('¿Cerrar el acceso de este equipo y liberar el lugar?')) return;
+  const disp = getDispositivos();
+  if (disp[id]) { delete disp[id]; setDispositivos(disp); await nubeGuardar(); }
+  if (id === deviceId()) { await logoutAdmin(); return; }   // me cerré a mí mismo
+  renderEquipos();
+  toast('✅ Acceso liberado');
 }
 
 function cargarEntregas() {
