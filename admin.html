@@ -8,11 +8,13 @@
   <link rel="stylesheet" href="css/estilos.css">
   <style>
     @media (max-width: 600px) {
-      .navbar { flex-wrap: wrap; gap: 6px; padding: 8px 10px; }
-      .navbar-actions { gap: 6px; flex-wrap: wrap; }
-      .navbar-actions .btn, #btnVerPublica, #btnLogout { font-size: 0.72rem; padding: 6px 9px; }
-      .bell-btn { font-size: 1rem; padding: 4px 8px; }
-      #navNombreApp { font-size: 1rem; }
+      .navbar { flex-wrap: nowrap; gap: 6px; padding: 8px 10px; }
+      .navbar-actions { gap: 6px; flex-shrink: 0; }
+      .navbar-actions .btn { font-size: 1.1rem; padding: 6px 9px; line-height: 1; }
+      .navbar-actions .btn-lbl { display: none; }   /* en celular: solo íconos */
+      .bell-btn { font-size: 1.1rem; padding: 6px 9px; }
+      .navbar-brand { min-width: 0; overflow: hidden; }
+      #navNombreApp { font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -32,8 +34,8 @@
       🔔
       <span class="bell-badge" id="bellBadge" style="display:none;"></span>
     </button>
-    <button class="btn btn-outline" id="btnVerPublica" title="Ver cómo queda tu página pública">👁️ Ver mi página</button>
-    <button class="btn btn-outline" id="btnLogout">Cerrar sesión</button>
+    <button class="btn btn-outline" id="btnVerPublica" title="Ver cómo queda tu página pública">👁️<span class="btn-lbl"> Ver mi página</span></button>
+    <button class="btn btn-outline" id="btnLogout" title="Cerrar sesión">🚪<span class="btn-lbl"> Cerrar sesión</span></button>
   </div>
 </nav>
 
