@@ -500,27 +500,19 @@ async function registrarDispositivo() {
     await nubeTraer();                 // trae la lista actual de equipos
     const disp = getDispositivos();
     const id = deviceId();
-    const VENTANA = 3 * 60 * 60 * 1000; // 3 horas: equipo inactivo libera su lugar
-    const ahora = Date.now();
-
-    // Liberar equipos inactivos (cerraron sin "Cerrar sesión")
-    Object.keys(disp).forEach(k => {
-      if (!disp[k] || !disp[k].ts || (ahora - disp[k].ts) > VENTANA) delete disp[k];
-    });
 
     if (disp[id]) {                    // este equipo ya estaba habilitado → renovar
-      disp[id].ts = ahora;
+      disp[id].ts = Date.now();
       if (!localStorage.getItem('operador_nombre') && disp[id].nombre) setOperador(disp[id].nombre);
       setDispositivos(disp);
+      localStorage.setItem('registrado', '1');
       await nubeGuardar();
       return { ok: true };
     }
 
     const max = maxPersonal();
     if (Object.keys(disp).length >= max) {
-      setDispositivos(disp);
-      await nubeGuardar();             // guardar la limpieza igual
-      return { ok: false, error: `Esta tienda ya tiene ${max} accesos activos.\nPara sumar más personal, escribí a ${PROVEEDOR_MAIL}` };
+      return { ok: false, error: `Esta tienda ya tiene ${max} equipos conectados.\nLiberá uno desde "Mi cuenta → Equipos con acceso" (botón ✕), o escribí a ${PROVEEDOR_MAIL} para sumar más personal.` };
     }
 
     let nombre = localStorage.getItem('operador_nombre');
@@ -529,8 +521,9 @@ async function registrarDispositivo() {
     }
     nombre = (nombre || '').trim() || 'Operador';
     setOperador(nombre);
-    disp[id] = { nombre, ts: ahora };
+    disp[id] = { nombre, ts: Date.now() };
     setDispositivos(disp);
+    localStorage.setItem('registrado', '1');
     await nubeGuardar();               // sube la lista actualizada
     return { ok: true };
   } catch (e) {
@@ -539,13 +532,14 @@ async function registrarDispositivo() {
   }
 }
 
-// Libera el lugar de este equipo (se llama al cerrar sesión).
+// Libera el lugar de este equipo (al cerrar sesión).
 async function liberarDispositivo() {
   try {
     const disp = getDispositivos();
     const id = deviceId();
     if (disp[id]) { delete disp[id]; setDispositivos(disp); await nubeGuardar(); }
   } catch (e) { /* no-op */ }
+  localStorage.removeItem('registrado');
 }
 
 // Borra TODAS las claves del inquilino (para arrancar limpio uno nuevo).
