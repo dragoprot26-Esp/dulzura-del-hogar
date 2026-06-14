@@ -23,6 +23,7 @@
       🔔
       <span class="bell-badge" id="bellBadge" style="display:none;"></span>
     </button>
+    <button class="btn btn-outline" id="btnVerPublica" title="Ver cómo queda tu página pública">👁️ Ver mi página</button>
     <button class="btn btn-outline" id="btnLogout">Cerrar sesión</button>
   </div>
 </nav>
@@ -443,8 +444,17 @@
   </div>
 </div>
 
-<script src="js/comun.js?v=3"></script>
-<script src="js/licencia.js?v=3"></script>
-<script src="js/admin.js?v=3"></script>
+<!-- ===== VISTA PREVIA DE LA PÁGINA PÚBLICA ===== -->
+<div id="previewOverlay" style="display:none;position:fixed;inset:0;z-index:10000;background:#000;">
+  <div style="height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--nav-bg,#3d1f10);color:#fff;">
+    <span style="font-weight:700;font-size:0.9rem;">👁️ Así ve tu página el público</span>
+    <button class="btn btn-outline btn-sm" onclick="cerrarPreview()" style="color:#fff;border-color:#fff;">✕ Cerrar vista previa</button>
+  </div>
+  <iframe id="previewFrame" title="Vista previa" style="width:100%;height:calc(100% - 50px);border:0;background:#fff;"></iframe>
+</div>
+
+<script src="js/comun.js?v=4"></script>
+<script src="js/licencia.js?v=4"></script>
+<script src="js/admin.js?v=4"></script>
 </body>
 </html>
