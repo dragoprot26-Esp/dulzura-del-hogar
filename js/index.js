@@ -289,7 +289,8 @@ function enviarPedido() {
   const prodId   = document.getElementById('pedidoProductoId').value;
   const errEl    = document.getElementById('pedidoError');
 
-  if (!nombre || !telefono) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
+  if (!nombre) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
+  if (telefono.replace(/\D/g, '').replace(/^549/, '').length < 6) { mostrarError(errEl, 'Completá tu número de teléfono después del +549.'); return; }
 
   const prod = getProductos().find(p => p.id === prodId);
   if (!prod) return;
@@ -390,7 +391,8 @@ async function enviarPedidoCarrito() {
   const nombre = document.getElementById('cartNombre').value.trim();
   const tel    = document.getElementById('cartTelefono').value.trim();
   const dir    = document.getElementById('cartDireccion').value.trim();
-  if (!nombre || !tel) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
+  if (!nombre) { mostrarError(errEl, 'Nombre y teléfono son obligatorios.'); return; }
+  if (tel.replace(/\D/g, '').replace(/^549/, '').length < 6) { mostrarError(errEl, 'Completá tu número de teléfono después del +549.'); return; }
 
   const total = c.reduce((s, i) => s + i.precio * i.cantidad, 0);
   const appNombre = localStorage.getItem('app_nombre') || 'Dulzura del Hogar';
