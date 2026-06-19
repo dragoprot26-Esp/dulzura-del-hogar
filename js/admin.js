@@ -144,7 +144,7 @@ function quitarLogoImagen() {
 function cargarDatosAdmin() {
   const nombre = localStorage.getItem('admin_nombre') || 'Administradora';
   const email  = localStorage.getItem('admin_email')  || '';
-  const tel    = localStorage.getItem('admin_telefono') || '';
+  const tel    = localStorage.getItem('admin_telefono') || '+549 ';
 
   if (document.getElementById('adminNombre'))   document.getElementById('adminNombre').value = nombre;
   if (document.getElementById('adminEmail'))    document.getElementById('adminEmail').value  = email;
@@ -162,7 +162,13 @@ function guardarDatosAdmin() {
   const t = document.getElementById('adminTelefono')?.value.trim();
   if (n) localStorage.setItem('admin_nombre', n);
   if (e) localStorage.setItem('admin_email', e);
-  if (t) localStorage.setItem('admin_telefono', t);
+  if (t) {
+    if (t.replace(/\D/g, '').replace(/^549/, '').length < 6) {
+      toast('⚠️ Completá el teléfono WhatsApp después del +549 (con código de área).');
+      return;
+    }
+    localStorage.setItem('admin_telefono', t);
+  }
   const op = document.getElementById('operadorNombre')?.value;
   if (op && op.trim()) setOperador(op);
   colaPush();
