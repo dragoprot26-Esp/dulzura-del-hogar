@@ -167,7 +167,11 @@
       <label for="cartDireccion">Dirección (opcional)</label>
       <input type="text" id="cartDireccion" placeholder="Para envío a domicilio">
     </div>
-    <button class="btn btn-primary btn-block" id="enviarCarrito">📲 Enviar pedido por WhatsApp</button>
+    <div style="display:flex;flex-direction:column;gap:6px;margin:4px 0 12px;font-size:0.85rem;color:var(--text2);">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="cartAvisarWA" checked style="width:18px;height:18px;accent-color:var(--primary);"> Avisar también por WhatsApp</label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;"><input type="checkbox" id="cartAvisarMail" style="width:18px;height:18px;accent-color:var(--primary);"> Avisar también por Mail</label>
+    </div>
+    <button class="btn btn-primary btn-block" id="enviarCarrito">🧾 Encargar</button>
     <button class="btn btn-ghost btn-block" id="vaciarCarrito" style="margin-top:8px;font-size:0.82rem;">Vaciar carrito</button>
   </div>
 </div>
