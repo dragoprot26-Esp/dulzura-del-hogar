@@ -245,11 +245,20 @@ async function intentarLogin() {
 
   if (res.ok) {
     document.getElementById('modalLogin').classList.remove('activo');
+    await ofrecerActivarBiometria();
     window.location.href = 'admin.html';
   } else {
     mostrarError(errEl, '⚠️ ' + (res.error || 'No se pudo ingresar.'));
     document.getElementById('loginPass').value = '';
   }
+}
+
+async function ofrecerActivarBiometria() {
+  try {
+    if (!biometriaDisponible() || biometriaRegistrada()) return;
+    if (!confirm('¿Activar ingreso con huella / PIN en este dispositivo para la próxima vez? (rápido y seguro)')) return;
+    await registrarBiometria();
+  } catch (e) { /* noop */ }
 }
 
 async function intentarLoginBiometrico() {
@@ -404,11 +413,20 @@ async function enviarPedidoCarrito() {
     try { await sbRPC('dulzura_nuevo_pedido', { p_codigo: codigo, p_pedido: pedido }, { conAuth: false }); } catch (e) { /* sigue por WhatsApp igual */ }
   }
 
-  // Armar el mensaje de WhatsApp al negocio
-  const lineas = c.map(i => `• ${i.nombre} × ${i.cantidad} — ${formatPrecio(i.precio * i.cantidad)}`).join('\n');
-  const msg = `🛒 *Nuevo pedido — ${appNombre}*\n\n👤 *Cliente:* ${nombre}\n📱 *Teléfono:* ${tel}${dir ? '\n📍 *Dirección:* ' + dir : ''}\n\n${lineas}\n\n*Total: ${formatPrecio(total)}*`;
-  const adminTel = (localStorage.getItem('admin_telefono') || '').replace(/\D/g, '');
-  if (adminTel) window.open(`https://wa.me/${adminTel}?text=${encodeURIComponent(msg)}`, '_blank');
+  // Avisos OPCIONALES al negocio (segun los checkboxes del carrito). El pedido ya quedo registrado arriba.
+  const avisarWA   = document.getElementById('cartAvisarWA')?.checked;
+  const avisarMail = document.getElementById('cartAvisarMail')?.checked;
+  const lineas  = c.map(i => `• ${i.nombre} × ${i.cantidad} — ${formatPrecio(i.precio * i.cantidad)}`).join('\n');
+  const detalle = `👤 Cliente: ${nombre}\n📱 Teléfono: ${tel}${dir ? '\n📍 Dirección: ' + dir : ''}\n\n${lineas}\n\nTotal: ${formatPrecio(total)}`;
+  if (avisarWA) {
+    const msg = `🛒 *Nuevo pedido — ${appNombre}*\n\n${detalle}`;
+    const adminTel = (localStorage.getItem('admin_telefono') || '').replace(/\D/g, '');
+    if (adminTel) window.open(`https://wa.me/${adminTel}?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+  if (avisarMail) {
+    const adminMail = localStorage.getItem('admin_email') || '';
+    if (adminMail) window.open(`mailto:${adminMail}?subject=${encodeURIComponent('Nuevo pedido — ' + appNombre)}&body=${encodeURIComponent(detalle)}`, '_blank');
+  }
 
   vaciarCarrito();
   document.getElementById('modalCarrito').classList.remove('activo');
