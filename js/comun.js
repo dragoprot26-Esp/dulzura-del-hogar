@@ -160,6 +160,32 @@ async function sbRPC(fn, params = {}, { conAuth = true } = {}) {
   }
 }
 
+// Egress: versión liviana (solo la fecha updated_at) para no bajar todo si no cambió.
+async function dulzuraVersion() {
+  const lic = obtenerLicencia();
+  if (!lic || !lic.codigo) return '';
+  const r = await sbRPC('dulzura_version', { p_codigo: lic.codigo }, { conAuth: true });
+  return (r && r.ok && r.data != null) ? String(r.data) : '';
+}
+
+// Comprime una imagen (achica a maxLado y baja a JPEG) antes de guardarla.
+function comprimirImg(file, maxLado, cb) {
+  const r = new FileReader();
+  r.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxLado || h > maxLado) { if (w >= h) { h = Math.round(h * maxLado / w); w = maxLado; } else { w = Math.round(w * maxLado / h); h = maxLado; } }
+      const c = document.createElement('canvas'); c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      try { cb(c.toDataURL('image/jpeg', 0.72)); } catch (e) { cb(r.result); }
+    };
+    img.onerror = () => cb(r.result);
+    img.src = r.result;
+  };
+  r.readAsDataURL(file);
+}
+
 /* ═════════════════════════════════════════════
    CUENTA SEGURA DEL DUEÑO (Supabase Auth)
    Email interno determinístico (igual que el servidor):

@@ -26,12 +26,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   mostrarInfoLicencia();
   cargarLinkTienda();
 
-  // Auto-actualización: cada 20s revisa la nube y muestra nuevos encargos solos
+  // Auto-actualización: cada 30s. Primero consulta liviana de versión; solo baja
+  // todo si algo cambió (ahorra egress).
+  let _lastVerDulz = '';
   setInterval(async () => {
     if (_pushPendiente) return;                                   // no pisar un guardado en curso
     if (document.querySelector('.modal-overlay.activo')) return;  // no molestar si está editando
     const ov = document.getElementById('previewOverlay');
     if (ov && ov.style.display === 'block') return;               // ni durante la vista previa
+    const ver = await dulzuraVersion();                           // consulta liviana (solo fecha)
+    if (!ver || ver === _lastVerDulz) return;                     // nada cambió → no bajamos todo
+    _lastVerDulz = ver;
     const ok = await nubeTraer();
     if (ok) {
       // Si este equipo fue cerrado de forma remota (✕), cerramos sesión solo
@@ -320,18 +325,12 @@ function quitarImagenProducto() {
 
 function procesarArchivoImagen(file) {
   if (!file) return;
-  if (file.size > 3 * 1024 * 1024) {
-    toast('⚠️ La imagen es muy grande (máximo 3 MB). Intentá con una más pequeña.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    imagenProductoActual = e.target.result;
+  comprimirImg(file, 1000, (dataUrl) => {
+    imagenProductoActual = dataUrl;
     const prev = document.getElementById('prodImagenPreview');
-    prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
+    prev.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
     toast('✅ Imagen cargada');
-  };
-  reader.readAsDataURL(file);
+  });
 }
 
 function guardarProducto() {
@@ -502,17 +501,11 @@ function quitarImagenPromo() {
 
 function procesarArchivoPromo(file) {
   if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    toast('⚠️ Imagen muy grande (máx 2 MB)');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    imagenPromoActual = e.target.result;
+  comprimirImg(file, 1000, (dataUrl) => {
+    imagenPromoActual = dataUrl;
     const prev = document.getElementById('promoImagenPreview');
-    prev.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;">`;
-  };
-  reader.readAsDataURL(file);
+    prev.innerHTML = `<img src="${dataUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+  });
 }
 
 /* ══════════════════════════════════════════
@@ -863,19 +856,16 @@ function configurarEventosAdmin() {
   document.getElementById('inputLogoFile')?.addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast('⚠️ Imagen muy grande (máx 2 MB)'); return; }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      logoBase64 = ev.target.result;
+    comprimirImg(file, 512, (dataUrl) => {
+      logoBase64 = dataUrl;
       const nombre = document.getElementById('inputNombreApp')?.value.trim() || 'Dulzura del Hogar';
       const wrap   = document.getElementById('logoPreviewWrap');
-      if (wrap) wrap.innerHTML = `<img src="${ev.target.result}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">`;
+      if (wrap) wrap.innerHTML = `<img src="${dataUrl}" style="width:44px;height:44px;border-radius:10px;object-fit:cover;">`;
       const fileNombre = document.getElementById('logoFileNombre');
       if (fileNombre) fileNombre.textContent = file.name;
-      actualizarNavBrand(nombre, '', ev.target.result);
+      actualizarNavBrand(nombre, '', dataUrl);
       toast('✅ Logo cargado');
-    };
-    reader.readAsDataURL(file);
+    });
   });
 
   // Emoji picker
